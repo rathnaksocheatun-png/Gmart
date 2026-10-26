@@ -561,7 +561,7 @@
                 </div>
                 <div class="flex-grow p-4 sm:p-6 overflow-y-auto space-y-6">
                     <div id="adminTabOverview" class="admin-tab-content space-y-6">
-                        <h3 class="text-lg font-bold text-white">Dashboard Overview</h3>
+                        <div class="flex items-center justify-between"><h3 class="text-lg font-bold text-white">Dashboard Overview</h3><button onclick="app.adminLogout()" class="sm:hidden px-3 py-1.5 bg-red-600/20 text-red-300 rounded-lg text-xs font-bold">Logout</button></div>
                         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
                             <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-xs">
                                 <p class="text-xs text-slate-400 font-semibold uppercase">Total Accounts</p>
@@ -637,34 +637,75 @@
     <!-- MAIN APP CONTROLLER SCRIPT (USING LOCALSTORAGE FALLBACK TO ENSURE DATA IS SHOWN) -->
     <script>
         class GMarttDatabase {
-            constructor() { this.t = ''; }
-            async init() {}
-            async getAll(store) {
+            constructor() {
+                this.remote = false; this.snap = {}; this.fresh = false; this.onError = null;
+                try { this.token = sessionStorage.getItem('gm_token') || ''; } catch (e) { this.token = ''; }
+            }
+            setToken(t) { this.token = t || ''; try { t ? sessionStorage.setItem('gm_token', t) : sessionStorage.removeItem('gm_token'); } catch (e) {} }
+            // Use the MongoDB API when available; otherwise fall back to localStorage (file:// / no server)
+            async init() {
                 try {
-                    const data = localStorage.getItem('gmartt_' + store);
-                    if (data) return JSON.parse(data);
-                } catch(e) {}
+                    const r = await fetch('/api/data', { cache: 'no-store' });
+                    const j = await r.json();
+                    if (!r.ok || !j || !Array.isArray(j.accounts)) throw new Error('no api');
+                    this.remote = true; this.snap = j; this.fresh = true;
+                } catch (e) { this.remote = false; }
+            }
+            async req(method, path, body) {
+                const r = await fetch('/api/' + path, { method, cache: 'no-store',
+                    headers: Object.assign({ 'Content-Type': 'application/json' }, this.token ? { Authorization: 'Bearer ' + this.token } : {}),
+                    body: body ? JSON.stringify(body) : undefined });
+                let j = {}; try { j = await r.json(); } catch (e) {}
+                if (!r.ok) { const err = new Error(j.error || ('Request failed (' + r.status + ')')); err.status = r.status; throw err; }
+                return j;
+            }
+            fail(e) { if (this.onError) this.onError(e); return false; }
+            async refresh() {
+                if (!this.remote) return;
+                if (this.fresh) { this.fresh = false; }
+                else { try { this.snap = await this.req('GET', 'data'); } catch (e) { return this.fail(e); } }
+                this.snap.orders = [];
+                if (this.token) { try { this.snap.orders = await this.req('GET', 'orders'); } catch (e) { if (e.status === 401) this.setToken(''); } }
+            }
+            async login(pw) { const j = await this.req('POST', 'login', { password: pw }); this.setToken(j.token); return true; }
+            async placeOrder(o) { try { return await this.req('POST', 'order', o); } catch (e) { this.fail(e); return null; } }
+            async getAll(store) {
+                if (this.remote) return store === 'settings' ? (this.snap.settings || []) : (this.snap[store] || []);
+                try { const data = localStorage.getItem('gmartt_' + store); if (data) return JSON.parse(data); } catch (e) {}
                 return [];
             }
             async put(store, item) {
+                if (this.remote) {
+                    try {
+                        if (store === 'settings') {
+                            if (item.key === 'admin_password') await this.req('PUT', 'password', { password: item.value });
+                            else if (item.key !== 'seeded') await this.req('PUT', 'settings/' + item.key, { value: item.value });
+                        } else await this.req('PUT', store + '/' + item.id, item);
+                        return item;
+                    } catch (e) { return this.fail(e); }
+                }
                 let items = await this.getAll(store);
                 const idx = items.findIndex(i => (i.id && i.id === item.id) || (i.key && i.key === item.key));
-                if (idx >= 0) items[idx] = item;
-                else items.push(item);
-                localStorage.setItem('gmartt_' + store, JSON.stringify(items));
+                if (idx >= 0) items[idx] = item; else items.push(item);
+                try { localStorage.setItem('gmartt_' + store, JSON.stringify(items)); } catch (e) { console.error(e); return false; }
                 return item;
             }
             async delete(store, id) {
+                if (this.remote) { try { await this.req('DELETE', store + '/' + id); return true; } catch (e) { return this.fail(e); } }
                 let items = await this.getAll(store);
                 items = items.filter(i => (i.id !== id) && (i.key !== id));
-                localStorage.setItem('gmartt_' + store, JSON.stringify(items));
+                try { localStorage.setItem('gmartt_' + store, JSON.stringify(items)); } catch (e) { console.error(e); }
             }
+            async clearOrders() { if (this.remote) { try { await this.req('DELETE', 'orders'); } catch (e) { this.fail(e); } } }
         }
 
         class GMarttApp {
             constructor() {
                 this.db = new GMarttDatabase();
-                this.syncChannel = new BroadcastChannel('gmartt_sync_channel');
+                this.db.onError = (e) => this.apiError(e);
+                this.syncChannel = ('BroadcastChannel' in window) ? new BroadcastChannel('gmartt_sync_channel') : null;
+                this.editingAccId = null;
+                this.pendingImages = [];
                 this.categories = [];
                 this.accounts = [];
                 this.banners = [];
@@ -683,6 +724,11 @@
                 await this.loadInitialData();
                 this.setupRealtimeSync();
                 this.renderAll();
+                // keep visitors' stock fresh across devices
+                setInterval(async () => {
+                    if (!this.db.remote || document.hidden || this.isAdminAuthenticated) return;
+                    await this.loadInitialData(); this.renderAll();
+                }, 30000);
             }
 
             showHome() {
@@ -692,9 +738,10 @@
             }
 
             async loadInitialData() {
-                this._seeded = (await this.db.getAll('settings')).some(s => s.key === 'seeded');
+                await this.db.refresh();
+                this._seeded = this.db.remote || (await this.db.getAll('settings')).some(s => s.key === 'seeded');
                 let cats = await this.db.getAll('categories');
-                if (cats.length === 0) {
+                if (cats.length === 0 && !this._seeded) {
                     cats = [
                         { id: '1', name: 'Free Fire', icon: 'https://placehold.co/100x100/0f172a/06b6d4?text=FF' },
                         { id: '2', name: 'PUBG Mobile', icon: 'https://placehold.co/100x100/0f172a/3b82f6?text=PUBG' },
@@ -706,7 +753,7 @@
                 this.categories = cats;
 
                 let accs = await this.db.getAll('accounts');
-                if (accs.length === 0) {
+                if (accs.length === 0 && !this._seeded) {
                     accs = [
                         { id: 'acc-101', game: 'Free Fire', title: 'Rare Incubator VIP Account', level: 72, price: 25.00, status: 'Available', desc: 'Includes 5 Evo Weapons Max, Hip Hop Season 1 Bundle.', images: ['https://placehold.co/600x350/0f172a/06b6d4?text=Free+Fire+VIP'] },
                         { id: 'acc-102', game: 'PUBG Mobile', title: 'M416 Glacier Max + Conqueror', level: 68, price: 45.00, status: 'Available', desc: 'M416 Glacier Lv 7, Mythic Fashion.', images: ['https://placehold.co/600x350/0f172a/3b82f6?text=PUBG+Glacier'] },
@@ -717,7 +764,7 @@
                 this.accounts = accs;
 
                 let banners = await this.db.getAll('banners');
-                if (banners.length === 0) {
+                if (banners.length === 0 && !this._seeded) {
                     banners = [
                         { id: 'b1', image: 'https://placehold.co/1000x400/0f172a/06b6d4?text=Welcome+to+G+martt' },
                         { id: 'b2', image: 'https://placehold.co/1000x400/0f172a/3b82f6?text=Instant+Account+Delivery' }
@@ -727,7 +774,7 @@
                 this.banners = banners;
 
                 let services = await this.db.getAll('services');
-                if (services.length === 0) {
+                if (services.length === 0 && !this._seeded) {
                     services = [
                         { id: 's1', title: 'Top Up Game Diamonds', desc: 'Instant diamond & UC top up', image: 'https://placehold.co/300x200/0f172a/06b6d4?text=Top+Up', link: 'https://t.me/zicksiik' },
                         { id: 's2', title: 'Middleman Escrow', desc: 'Safe & secure trade escrow', image: 'https://placehold.co/300x200/0f172a/3b82f6?text=Escrow', link: 'https://t.me/zicksiik' },
@@ -740,6 +787,7 @@
                 }
                 this.services = services;
 
+                if (!this._seeded) { await this.db.put('settings', { key: 'seeded', value: 1 }); this._seeded = true; }
                 this.orders = await this.db.getAll('orders');
                 let storedSettings = await this.db.getAll('settings');
                 let khqrSetting = storedSettings.find(s => s.key === 'khqr_image');
@@ -747,10 +795,11 @@
                 let logoSetting = storedSettings.find(s => s.key === 'site_logo');
                 this.settings.logo = logoSetting ? logoSetting.value : 'https://placehold.co/100x100/0f172a/06b6d4?text=GM';
                 let passSetting = storedSettings.find(s => s.key === 'admin_password');
-                this.settings.adminPassword = passSetting ? passSetting.value : 'ceogmart@2026';
+                this.settings.adminPassword = this.db.remote ? '' : (passSetting ? passSetting.value : 'ceogmart@2026');
             }
 
             setupRealtimeSync() {
+                if (!this.syncChannel) return;
                 this.syncChannel.onmessage = async (event) => {
                     if (event.data && event.data.type === 'DATA_UPDATED') {
                         await this.loadInitialData();
@@ -760,7 +809,7 @@
             }
 
             notifySync() {
-                this.syncChannel.postMessage({ type: 'DATA_UPDATED', timestamp: Date.now() });
+                if (this.syncChannel) this.syncChannel.postMessage({ type: 'DATA_UPDATED', timestamp: Date.now() });
             }
 
             renderAll() {
@@ -789,9 +838,9 @@
                 this.categories.forEach(cat => {
                     const isSelected = this.selectedCategory === cat.name;
                     html += `
-                        <button onclick="app.selectCategory('${cat.name}')" class="shrink-0 flex items-center space-x-2 px-3 py-1.5 rounded-xl text-xs font-bold transition ${isSelected ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-md' : 'bg-slate-900 text-slate-300 border border-blue-500/30 hover:border-cyan-400'}">
-                            <img src="${cat.icon}" alt="${cat.name}" class="w-5 h-5 rounded-md object-cover" onerror="this.src='https://placehold.co/50x50/0f172a/06b6d4?text=GM'">
-                            <span>${cat.name}</span>
+                        <button onclick="app.selectCategory(decodeURIComponent('${encodeURIComponent(cat.name)}'))" class="shrink-0 flex items-center space-x-2 px-3 py-1.5 rounded-xl text-xs font-bold transition ${isSelected ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-md' : 'bg-slate-900 text-slate-300 border border-blue-500/30 hover:border-cyan-400'}">
+                            <img src="${this.esc(cat.icon)}" alt="${this.esc(cat.name)}" class="w-5 h-5 rounded-md object-cover" onerror="this.src='https://placehold.co/50x50/0f172a/06b6d4?text=GM'">
+                            <span>${this.esc(cat.name)}</span>
                         </button>
                     `;
                 });
@@ -807,19 +856,21 @@
             renderBanners() {
                 const container = document.getElementById('bannerCarousel');
                 const indicators = document.getElementById('bannerIndicators');
-                if (this.banners.length === 0) return;
-                let html = '', indHtml = '';
-                this.banners.forEach((b, idx) => {
-                    html += `<img src="${b.image}" class="w-full h-full object-cover shrink-0" alt="Banner ${idx}">`;
-                    indHtml += `<div class="w-2 h-2 rounded-full transition-all ${idx === this.currentBannerIndex ? 'bg-cyan-400 w-5' : 'bg-white/40'}"></div>`;
-                });
-                container.innerHTML = html;
-                indicators.innerHTML = indHtml;
-                container.style.transform = `translateX(-${this.currentBannerIndex * 100}%)`;
-
-                if (!this.bannerInterval && this.banners.length > 1) {
-                    this.bannerInterval = setInterval(() => this.nextBanner(), 4000);
+                if (this.banners.length === 0) {
+                    container.innerHTML = ''; indicators.innerHTML = '';
+                    clearInterval(this.bannerInterval); this.bannerInterval = null;
+                    return;
                 }
+                if (this.currentBannerIndex >= this.banners.length) this.currentBannerIndex = 0;
+                const sig = this.banners.map(b => b.id + b.image.length).join('|');
+                if (container.dataset.sig !== sig) {
+                    container.innerHTML = this.banners.map((b, i) => `<img src="${this.esc(b.image)}" class="w-full h-full object-cover shrink-0" alt="Banner ${i + 1}">`).join('');
+                    container.dataset.sig = sig;
+                }
+                indicators.innerHTML = this.banners.map((b, i) => `<div class="h-2 rounded-full transition-all ${i === this.currentBannerIndex ? 'bg-cyan-400 w-5' : 'bg-white/40 w-2'}"></div>`).join('');
+                container.style.transform = `translateX(-${this.currentBannerIndex * 100}%)`;
+                if (!this.bannerInterval && this.banners.length > 1) this.bannerInterval = setInterval(() => this.nextBanner(), 4000);
+                if (this.banners.length <= 1 && this.bannerInterval) { clearInterval(this.bannerInterval); this.bannerInterval = null; }
             }
 
             nextBanner() {
@@ -858,10 +909,10 @@
                     html += `
                         <div class="bg-slate-900 rounded-2xl border border-blue-500/30 overflow-hidden shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col group">
                             <div class="relative aspect-video bg-slate-950 overflow-hidden cursor-pointer" onclick="app.openAccountModal('${acc.id}')">
-                                <img src="${mainImg}" alt="${acc.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                                <img src="${this.esc(mainImg)}" alt="${this.esc(acc.title)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
                                 <div class="absolute top-2 left-2 flex space-x-1">
-                                    <span class="px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md text-white text-[10px] font-bold uppercase border border-blue-500/30">${acc.game}</span>
-                                    <span class="px-2 py-0.5 rounded-md bg-blue-600 text-white text-[10px] font-bold">LVL ${acc.level}</span>
+                                    <span class="px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md text-white text-[10px] font-bold uppercase border border-blue-500/30">${this.esc(acc.game)}</span>
+                                    <span class="px-2 py-0.5 rounded-md bg-blue-600 text-white text-[10px] font-bold">LVL ${this.esc(acc.level)}</span>
                                 </div>
                                 <div class="absolute bottom-2 right-2">
                                     <span class="px-2 py-0.5 rounded-full ${isAvailable ? 'bg-cyan-500/90 text-slate-950' : 'bg-red-500/90 text-white'} text-[10px] font-bold uppercase backdrop-blur-xs">
@@ -872,9 +923,9 @@
                             <div class="p-3.5 flex-grow flex flex-col justify-between space-y-3">
                                 <div>
                                     <h3 class="gaming-font text-base font-bold text-slate-100 line-clamp-1 group-hover:text-cyan-400 transition cursor-pointer" onclick="app.openAccountModal('${acc.id}')">
-                                        ${acc.title}
+                                        ${this.esc(acc.title)}
                                     </h3>
-                                    <p class="text-[11px] text-slate-400 line-clamp-2 mt-1">${acc.desc}</p>
+                                    <p class="text-[11px] text-slate-400 line-clamp-2 mt-1">${this.esc(acc.desc)}</p>
                                 </div>
                                 <div class="flex items-center justify-between pt-2 border-t border-slate-800">
                                     <div>
@@ -906,13 +957,13 @@
                     html += `
                         <div class="bg-slate-900 p-3 rounded-2xl border border-blue-500/30 shadow-xs flex flex-col justify-between space-y-2 hover:border-cyan-400 transition">
                             <div class="aspect-video rounded-xl overflow-hidden bg-slate-950">
-                                <img src="${s.image}" alt="${s.title}" class="w-full h-full object-cover">
+                                <img src="${this.esc(s.image)}" alt="${this.esc(s.title)}" class="w-full h-full object-cover">
                             </div>
                             <div>
-                                <h4 class="gaming-font text-sm font-bold text-slate-100 line-clamp-1">${s.title}</h4>
-                                <p class="text-[10px] text-slate-400 line-clamp-2">${s.desc || ''}</p>
+                                <h4 class="gaming-font text-sm font-bold text-slate-100 line-clamp-1">${this.esc(s.title)}</h4>
+                                <p class="text-[10px] text-slate-400 line-clamp-2">${this.esc(s.desc || '')}</p>
                             </div>
-                            <a href="${s.link || '#'}" target="_blank" class="w-full py-1.5 rounded-lg bg-blue-950/60 text-cyan-300 border border-blue-500/30 hover:bg-cyan-500 hover:text-slate-950 transition text-center text-[11px] font-bold block">
+                            <a href="${this.esc(s.link || '#')}" target="_blank" rel="noopener" class="w-full py-1.5 rounded-lg bg-blue-950/60 text-cyan-300 border border-blue-500/30 hover:bg-cyan-500 hover:text-slate-950 transition text-center text-[11px] font-bold block">
                                 Service Details <i class="fa-solid fa-arrow-right text-[9px] ml-1"></i>
                             </a>
                         </div>
@@ -942,7 +993,7 @@
 
                 let thumbHtml = '';
                 images.forEach(img => {
-                    thumbHtml += `<img src="${img}" onclick="document.getElementById('modalMainImage').src='${img}'" class="w-12 h-9 object-cover rounded border border-slate-700 cursor-pointer hover:border-cyan-400">`;
+                    thumbHtml += `<img src="${this.esc(img)}" onclick="document.getElementById('modalMainImage').src=this.src" class="w-12 h-9 object-cover rounded border border-slate-700 cursor-pointer hover:border-cyan-400">`;
                 });
                 thumbsContainer.innerHTML = thumbHtml;
                 document.getElementById('accountModal').classList.remove('hidden', 'opacity-0');
@@ -976,21 +1027,23 @@
             async submitOrderAndShowPayment() {
                 const nameInput = document.getElementById('customerNameInput').value.trim();
                 if (!nameInput) { alert('Please enter your NAME / USERNAME.'); return; }
-                const currentAcc = this.accounts.find(a => a.id === this.activeAccount.id);
-                currentAcc.status = 'Sold';
-                await this.db.put('accounts', currentAcc);
-
-                const newOrder = {
-                    id: document.getElementById('checkoutOrderId').innerText,
-                    customerName: nameInput,
-                    accountTitle: currentAcc.title,
-                    price: currentAcc.price,
-                    createdAt: new Date().toISOString()
-                };
-                await this.db.put('orders', newOrder);
+                if (!this.activeAccount) return;
+                const orderId = document.getElementById('checkoutOrderId').innerText;
+                if (this.db.remote) {
+                    // server marks the account Sold atomically, so two buyers can't get the same account
+                    const r = await this.db.placeOrder({ orderId, accountId: this.activeAccount.id, customerName: nameInput, gameId: document.getElementById('customerGameIdInput').value.trim() });
+                    if (!r) { await this.loadInitialData(); this.renderAll(); this.closeCheckoutModal(); return; }
+                    document.getElementById('checkoutOrderId').innerText = r.id;
+                } else {
+                    const currentAcc = this.accounts.find(a => a.id === this.activeAccount.id);
+                    if (!currentAcc || currentAcc.status !== 'Available') { alert('Sorry, this account is no longer available.'); this.closeCheckoutModal(); return this.renderAccounts(); }
+                    currentAcc.status = 'Sold';
+                    await this.db.put('accounts', currentAcc);
+                    await this.db.put('orders', { id: orderId, customerName: nameInput, accountTitle: currentAcc.title, price: currentAcc.price, createdAt: new Date().toISOString() });
+                }
                 this.notifySync();
-                this.renderAccounts();
-
+                await this.loadInitialData();
+                this.renderAll();
                 document.getElementById('checkoutStep1').classList.add('hidden');
                 document.getElementById('checkoutStep2').classList.remove('hidden');
             }
@@ -1006,31 +1059,346 @@
                 window.open("https://www.facebook.com/share/1CGi7f9kEZ/?mibextid=wwXIfr", '_blank');
             }
 
+            esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+            get F() { return 'w-full px-3 py-2 text-sm bg-slate-950 text-slate-100 border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500'; }
+            get C() { return 'bg-slate-900 p-4 rounded-xl border border-slate-800 space-y-3'; }
+            get B() { return 'shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition '; }
+            toast(msg, bad) {
+                const t = document.createElement('div');
+                t.textContent = msg;
+                t.className = 'fixed left-1/2 -translate-x-1/2 top-6 z-[200] px-4 py-2 rounded-xl text-sm font-bold shadow-xl ' + (bad ? 'bg-red-600 text-white' : 'bg-cyan-500 text-slate-950');
+                document.body.appendChild(t);
+                setTimeout(() => t.remove(), 2200);
+            }
+            fileToData(file, max = 900, type = 'image/jpeg') {
+                return new Promise((res, rej) => {
+                    const r = new FileReader();
+                    r.onerror = () => rej(new Error('read'));
+                    r.onload = () => {
+                        const img = new Image();
+                        img.onerror = () => rej(new Error('img'));
+                        img.onload = () => {
+                            const k = Math.min(1, max / Math.max(img.width, img.height));
+                            const c = document.createElement('canvas');
+                            c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+                            c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+                            res(c.toDataURL(type, 0.85));
+                        };
+                        img.src = r.result;
+                    };
+                    r.readAsDataURL(file);
+                });
+            }
+            // file input (preferred) or URL input -> image string
+            async pickImage(fileId, urlId, max, type) {
+                const f = document.getElementById(fileId).files[0];
+                if (f) { try { return await this.fileToData(f, max, type); } catch (e) { this.toast('Invalid image file', true); return null; } }
+                const u = document.getElementById(urlId).value.trim();
+                if (u && !/^(https?:\/\/|data:image\/)/i.test(u)) { this.toast('Image URL must start with http(s)://', true); return null; }
+                return u;
+            }
+            apiError(e) {
+                this.toast((e && e.message) || 'Network error', true);
+                if (e && e.status === 401) { this.db.setToken(''); if (this.isAdminAuthenticated) this.adminLogout(); }
+            }
+            async save(store, item) {
+                const ok = await this.db.put(store, item);
+                if (!ok && !this.db.remote) this.toast('Save failed: storage full. Use smaller images.', true);
+                return ok;
+            }
+            async afterChange() { await this.loadInitialData(); this.notifySync(); this.renderAll(); }
+
             openAdminModal() { document.getElementById('adminModal').classList.remove('hidden'); }
             closeAdminModal() { document.getElementById('adminModal').classList.add('hidden'); }
-            handleAdminLogin(e) {
+            async handleAdminLogin(e) {
                 e.preventDefault();
-                if (document.getElementById('adminPasswordInput').value === this.settings.adminPassword) {
-                    this.isAdminAuthenticated = true;
-                    document.getElementById('adminLoginForm').classList.add('hidden');
-                    document.getElementById('adminDashboard').classList.remove('hidden');
-                    document.getElementById('adminAuthStatus').innerText = 'Status: Authenticated Admin';
-                    this.renderAdminPanels();
-                } else { alert('Invalid Password!'); }
+                const inp = document.getElementById('adminPasswordInput');
+                let ok = false;
+                if (this.db.remote) {
+                    try { ok = await this.db.login(inp.value); } catch (err) { this.toast(err.message, true); inp.select(); return; }
+                } else ok = inp.value === this.settings.adminPassword;
+                if (!ok) { this.toast('Invalid Password!', true); inp.select(); return; }
+                this.isAdminAuthenticated = true;
+                inp.value = '';
+                document.getElementById('adminLoginForm').classList.add('hidden');
+                document.getElementById('adminDashboard').classList.remove('hidden');
+                document.getElementById('adminAuthStatus').innerText = 'Status: Authenticated Admin';
+                if (this.db.remote) await this.loadInitialData();
+                this.renderAll();
+                this.switchAdminTab('overview');
             }
             adminLogout() {
                 this.isAdminAuthenticated = false;
+                this.db.setToken(''); this.orders = [];
                 document.getElementById('adminLoginForm').classList.remove('hidden');
                 document.getElementById('adminDashboard').classList.add('hidden');
+                document.getElementById('adminAuthStatus').innerText = 'Status: Locked';
             }
             switchAdminTab(tab) {
                 document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.add('hidden'));
                 document.getElementById(`adminTab${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.remove('hidden');
+                document.querySelectorAll('.admin-tab-btn').forEach(b => {
+                    const on = (b.getAttribute('onclick') || '').includes(`'${tab}'`);
+                    b.classList.toggle('bg-slate-800', on);
+                    b.classList.toggle('text-white', on);
+                });
             }
+
             renderAdminPanels() {
-                document.getElementById('statTotalAccounts').innerText = this.accounts.length;
-                document.getElementById('statAvailableAccounts').innerText = this.accounts.filter(a => a.status === 'Available').length;
-                document.getElementById('statSoldAccounts').innerText = this.accounts.filter(a => a.status === 'Sold').length;
+                const revenue = this.orders.reduce((s, o) => s + (parseFloat(o.price) || 0), 0);
+                const set = (id, v) => { const e = document.getElementById(id); if (e) e.innerText = v; };
+                set('statTotalAccounts', this.accounts.length);
+                set('statAvailableAccounts', this.accounts.filter(a => a.status === 'Available').length);
+                set('statSoldAccounts', this.accounts.filter(a => a.status === 'Sold').length);
+                set('statTotalRevenue', '$' + revenue.toFixed(2));
+                const body = (tab) => {
+                    const t = document.getElementById('adminTab' + tab);
+                    let b = t.querySelector('.admin-body');
+                    if (!b) { b = document.createElement('div'); b.className = 'admin-body space-y-4'; t.appendChild(b); }
+                    return b;
+                };
+                body('Accounts').innerHTML = this.tplAccounts();
+                body('Categories').innerHTML = this.tplCategories();
+                body('Banners').innerHTML = this.tplBanners();
+                body('Services').innerHTML = this.tplServices();
+                body('Orders').innerHTML = this.tplOrders();
+                body('Settings').innerHTML = this.tplSettings();
+            }
+
+            /* ---------- ACCOUNTS ---------- */
+            imgPrevHtml() {
+                return this.pendingImages.map((im, i) => `<div class="relative"><img src="${this.esc(im)}" class="w-16 h-12 object-cover rounded border border-slate-700"><button type="button" onclick="app.removeAccImage(${i})" class="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-600 text-white text-[10px]">×</button></div>`).join('') || '<span class="text-[11px] text-slate-500">No images yet</span>';
+            }
+            tplAccounts() {
+                const e = this.accounts.find(a => a.id === this.editingAccId);
+                const v = e || { game: '', title: '', level: '', price: '', status: 'Available', desc: '' };
+                const opts = this.categories.map(c => `<option ${c.name === v.game ? 'selected' : ''}>${this.esc(c.name)}</option>`).join('');
+                const list = this.accounts.map(a => `
+                    <div class="flex items-center gap-2 bg-slate-950 p-2 rounded-lg border border-slate-800">
+                        <img src="${this.esc((a.images || [])[0] || '')}" class="w-14 h-10 object-cover rounded shrink-0" onerror="this.style.visibility='hidden'">
+                        <div class="flex-grow min-w-0">
+                            <p class="text-xs font-bold truncate">${this.esc(a.title)}</p>
+                            <p class="text-[10px] text-slate-400">${this.esc(a.game)} · LVL ${this.esc(a.level)} · $${(parseFloat(a.price) || 0).toFixed(2)} · <span class="${a.status === 'Available' ? 'text-cyan-400' : 'text-red-400'}">${this.esc(a.status)}</span></p>
+                        </div>
+                        <button onclick="app.toggleAccountStatus('${a.id}')" class="${this.B}bg-slate-800 text-cyan-300">${a.status === 'Available' ? 'Mark Sold' : 'Restore'}</button>
+                        <button onclick="app.editAccount('${a.id}')" class="${this.B}bg-blue-600 text-white">Edit</button>
+                        <button onclick="app.deleteAccount('${a.id}')" class="${this.B}bg-red-600/80 text-white">Del</button>
+                    </div>`).join('') || '<p class="text-xs text-slate-500">No accounts yet.</p>';
+                return `
+                <div class="${this.C}">
+                    <h4 class="font-bold text-sm text-cyan-300">${e ? 'Edit Account' : 'Add New Account'}</h4>
+                    <div class="grid sm:grid-cols-2 gap-3">
+                        <select id="fAccGame" class="${this.F}">${opts}</select>
+                        <input id="fAccTitle" class="${this.F}" placeholder="Account title" value="${this.esc(v.title)}">
+                        <input id="fAccLevel" type="number" min="1" class="${this.F}" placeholder="Level" value="${this.esc(v.level)}">
+                        <input id="fAccPrice" type="number" min="0" step="0.01" class="${this.F}" placeholder="Price (USD)" value="${this.esc(v.price)}">
+                        <select id="fAccStatus" class="${this.F}"><option ${v.status === 'Available' ? 'selected' : ''}>Available</option><option ${v.status === 'Sold' ? 'selected' : ''}>Sold</option></select>
+                    </div>
+                    <textarea id="fAccDesc" rows="2" class="${this.F}" placeholder="Description">${this.esc(v.desc)}</textarea>
+                    <div class="flex flex-wrap gap-2 items-center">
+                        <input id="fAccImgFile" type="file" accept="image/*" multiple onchange="app.addAccImages(this)" class="text-xs text-slate-300 max-w-full">
+                        <input id="fAccImgUrl" class="${this.F} flex-1 min-w-[140px]" placeholder="or image URL">
+                        <button type="button" onclick="app.addAccImageUrl()" class="${this.B}bg-slate-800 text-cyan-300">Add URL</button>
+                    </div>
+                    <div id="accImgPrev" class="flex flex-wrap gap-2">${this.imgPrevHtml()}</div>
+                    <div class="flex gap-2">
+                        <button onclick="app.saveAccount()" class="${this.B}bg-blue-600 hover:bg-blue-700 text-white px-4 py-2">${e ? 'Update Account' : 'Add Account'}</button>
+                        ${e ? `<button onclick="app.cancelEditAccount()" class="${this.B}bg-slate-800 text-slate-300 px-4 py-2">Cancel</button>` : ''}
+                    </div>
+                </div>
+                <div class="${this.C}">${list}</div>`;
+            }
+            async addAccImages(inp) {
+                for (const f of inp.files) { try { this.pendingImages.push(await this.fileToData(f, 900)); } catch (e) { this.toast('Invalid image', true); } }
+                inp.value = '';
+                document.getElementById('accImgPrev').innerHTML = this.imgPrevHtml();
+            }
+            addAccImageUrl() {
+                const i = document.getElementById('fAccImgUrl'), u = i.value.trim();
+                if (!/^https?:\/\//i.test(u)) return this.toast('Enter a valid http(s) URL', true);
+                this.pendingImages.push(u); i.value = '';
+                document.getElementById('accImgPrev').innerHTML = this.imgPrevHtml();
+            }
+            removeAccImage(i) { this.pendingImages.splice(i, 1); document.getElementById('accImgPrev').innerHTML = this.imgPrevHtml(); }
+            async saveAccount() {
+                const g = id => document.getElementById(id).value.trim();
+                const title = g('fAccTitle'), price = parseFloat(g('fAccPrice')), level = parseInt(g('fAccLevel'));
+                if (!g('fAccGame')) return this.toast('Add a category first', true);
+                if (!title) return this.toast('Title is required', true);
+                if (isNaN(price) || price < 0) return this.toast('Enter a valid price', true);
+                const old = this.accounts.find(a => a.id === this.editingAccId);
+                const acc = { id: old ? old.id : 'acc-' + Date.now(), game: g('fAccGame'), title, level: isNaN(level) ? 1 : level, price, status: g('fAccStatus'), desc: g('fAccDesc'), images: this.pendingImages.slice() };
+                if (!(await this.save('accounts', acc))) return;
+                this.editingAccId = null; this.pendingImages = [];
+                await this.afterChange(); this.toast('Account saved ✓');
+            }
+            editAccount(id) {
+                const a = this.accounts.find(x => x.id === id); if (!a) return;
+                this.editingAccId = id; this.pendingImages = (a.images || []).slice();
+                this.renderAdminPanels();
+                document.getElementById('adminTabAccounts').scrollIntoView({ behavior: 'smooth' });
+            }
+            cancelEditAccount() { this.editingAccId = null; this.pendingImages = []; this.renderAdminPanels(); }
+            async toggleAccountStatus(id) {
+                const a = this.accounts.find(x => x.id === id); if (!a) return;
+                a.status = a.status === 'Available' ? 'Sold' : 'Available';
+                if (await this.save('accounts', a)) { await this.afterChange(); }
+            }
+            async deleteAccount(id) {
+                if (!confirm('Delete this account?')) return;
+                await this.db.delete('accounts', id);
+                if (this.editingAccId === id) { this.editingAccId = null; this.pendingImages = []; }
+                await this.afterChange(); this.toast('Deleted');
+            }
+
+            /* ---------- CATEGORIES ---------- */
+            tplCategories() {
+                const list = this.categories.map(c => `
+                    <div class="flex items-center gap-3 bg-slate-950 p-2 rounded-lg border border-slate-800">
+                        <img src="${this.esc(c.icon)}" class="w-9 h-9 rounded-md object-cover" onerror="this.style.visibility='hidden'">
+                        <span class="flex-grow text-sm font-bold">${this.esc(c.name)}</span>
+                        <button onclick="app.deleteCategory('${c.id}')" class="${this.B}bg-red-600/80 text-white">Delete</button>
+                    </div>`).join('') || '<p class="text-xs text-slate-500">No categories.</p>';
+                return `<div class="${this.C}">
+                    <h4 class="font-bold text-sm text-cyan-300">Add Category</h4>
+                    <input id="fCatName" class="${this.F}" placeholder="Game / category name">
+                    <div class="flex flex-wrap gap-2 items-center"><input id="fCatFile" type="file" accept="image/*" class="text-xs text-slate-300 max-w-full"><input id="fCatUrl" class="${this.F} flex-1 min-w-[140px]" placeholder="or icon URL"></div>
+                    <button onclick="app.addCategory()" class="${this.B}bg-blue-600 text-white px-4 py-2">Add Category</button>
+                </div><div class="${this.C}">${list}</div>`;
+            }
+            async addCategory() {
+                const name = document.getElementById('fCatName').value.trim();
+                if (!name) return this.toast('Category name is required', true);
+                if (this.categories.some(c => c.name.toLowerCase() === name.toLowerCase())) return this.toast('Category already exists', true);
+                const icon = await this.pickImage('fCatFile', 'fCatUrl', 160, 'image/png');
+                if (icon === null) return;
+                if (await this.save('categories', { id: 'cat-' + Date.now(), name, icon: icon || 'https://placehold.co/100x100/0f172a/06b6d4?text=' + encodeURIComponent(name.slice(0, 4)) })) { await this.afterChange(); this.toast('Category added ✓'); }
+            }
+            async deleteCategory(id) {
+                const c = this.categories.find(x => x.id === id); if (!c) return;
+                if (!confirm(`Delete category "${c.name}"? Existing accounts keep their game name.`)) return;
+                await this.db.delete('categories', id);
+                if (this.selectedCategory === c.name) this.selectedCategory = 'All';
+                await this.afterChange(); this.toast('Deleted');
+            }
+
+            /* ---------- BANNERS ---------- */
+            tplBanners() {
+                const list = this.banners.map(b => `
+                    <div class="flex items-center gap-3 bg-slate-950 p-2 rounded-lg border border-slate-800">
+                        <img src="${this.esc(b.image)}" class="w-24 h-12 rounded object-cover" onerror="this.style.visibility='hidden'">
+                        <span class="flex-grow text-[11px] text-slate-400 truncate">${this.esc(b.id)}</span>
+                        <button onclick="app.deleteBanner('${b.id}')" class="${this.B}bg-red-600/80 text-white">Delete</button>
+                    </div>`).join('') || '<p class="text-xs text-slate-500">No banners.</p>';
+                return `<div class="${this.C}">
+                    <h4 class="font-bold text-sm text-cyan-300">Add Banner</h4>
+                    <div class="flex flex-wrap gap-2 items-center"><input id="fBanFile" type="file" accept="image/*" class="text-xs text-slate-300 max-w-full"><input id="fBanUrl" class="${this.F} flex-1 min-w-[140px]" placeholder="or banner URL"></div>
+                    <button onclick="app.addBanner()" class="${this.B}bg-blue-600 text-white px-4 py-2">Add Banner</button>
+                </div><div class="${this.C}">${list}</div>`;
+            }
+            async addBanner() {
+                const image = await this.pickImage('fBanFile', 'fBanUrl', 1400);
+                if (image === null) return;
+                if (!image) return this.toast('Choose an image or enter a URL', true);
+                if (await this.save('banners', { id: 'ban-' + Date.now(), image })) { await this.afterChange(); this.toast('Banner added ✓'); }
+            }
+            async deleteBanner(id) {
+                if (!confirm('Delete this banner?')) return;
+                await this.db.delete('banners', id);
+                await this.afterChange(); this.toast('Deleted');
+            }
+
+            /* ---------- SERVICES ---------- */
+            tplServices() {
+                const list = this.services.map(s => `
+                    <div class="flex items-center gap-3 bg-slate-950 p-2 rounded-lg border border-slate-800">
+                        <img src="${this.esc(s.image)}" class="w-14 h-10 rounded object-cover" onerror="this.style.visibility='hidden'">
+                        <div class="flex-grow min-w-0"><p class="text-xs font-bold truncate">${this.esc(s.title)}</p><p class="text-[10px] text-slate-400 truncate">${this.esc(s.link)}</p></div>
+                        <button onclick="app.deleteService('${s.id}')" class="${this.B}bg-red-600/80 text-white">Delete</button>
+                    </div>`).join('') || '<p class="text-xs text-slate-500">No services.</p>';
+                return `<div class="${this.C}">
+                    <h4 class="font-bold text-sm text-cyan-300">Add Service <span class="text-[10px] text-slate-500 font-normal">(first 6 are shown on the site)</span></h4>
+                    <div class="grid sm:grid-cols-2 gap-3">
+                        <input id="fSvTitle" class="${this.F}" placeholder="Title">
+                        <input id="fSvLink" class="${this.F}" placeholder="Link (https://t.me/...)">
+                    </div>
+                    <input id="fSvDesc" class="${this.F}" placeholder="Short description">
+                    <div class="flex flex-wrap gap-2 items-center"><input id="fSvFile" type="file" accept="image/*" class="text-xs text-slate-300 max-w-full"><input id="fSvUrl" class="${this.F} flex-1 min-w-[140px]" placeholder="or image URL"></div>
+                    <button onclick="app.addService()" class="${this.B}bg-blue-600 text-white px-4 py-2">Add Service</button>
+                </div><div class="${this.C}">${list}</div>`;
+            }
+            async addService() {
+                const g = id => document.getElementById(id).value.trim();
+                const title = g('fSvTitle'); let link = g('fSvLink');
+                if (!title) return this.toast('Title is required', true);
+                if (link && !/^https?:\/\//i.test(link)) return this.toast('Link must start with http(s)://', true);
+                const image = await this.pickImage('fSvFile', 'fSvUrl', 500);
+                if (image === null) return;
+                if (await this.save('services', { id: 'sv-' + Date.now(), title, desc: g('fSvDesc'), link: link || '#', image: image || 'https://placehold.co/300x200/0f172a/06b6d4?text=' + encodeURIComponent(title.slice(0, 10)) })) { await this.afterChange(); this.toast('Service added ✓'); }
+            }
+            async deleteService(id) {
+                if (!confirm('Delete this service?')) return;
+                await this.db.delete('services', id);
+                await this.afterChange(); this.toast('Deleted');
+            }
+
+            /* ---------- ORDERS ---------- */
+            tplOrders() {
+                const rows = [...this.orders].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')).map(o => `
+                    <div class="flex items-center gap-3 bg-slate-950 p-3 rounded-lg border border-slate-800">
+                        <div class="flex-grow min-w-0">
+                            <p class="text-xs font-bold truncate">${this.esc(o.id)} · ${this.esc(o.customerName)}</p>
+                            <p class="text-[10px] text-slate-400 truncate">${this.esc(o.accountTitle)} · ${o.createdAt ? new Date(o.createdAt).toLocaleString() : ''}</p>
+                        </div>
+                        <span class="gaming-font font-extrabold text-cyan-400">$${(parseFloat(o.price) || 0).toFixed(2)}</span>
+                        <button onclick="app.deleteOrder('${o.id}')" class="${this.B}bg-red-600/80 text-white">Del</button>
+                    </div>`).join('') || '<p class="text-xs text-slate-500">No orders yet.</p>';
+                return `<div class="${this.C}">${this.orders.length ? `<button onclick="app.clearOrders()" class="${this.B}bg-red-600/20 text-red-300 hover:bg-red-600 hover:text-white">Clear all orders</button>` : ''}${rows}</div>`;
+            }
+            async deleteOrder(id) {
+                if (!confirm('Delete this order?')) return;
+                await this.db.delete('orders', id);
+                await this.afterChange();
+            }
+            async clearOrders() {
+                if (!confirm('Delete ALL orders? This cannot be undone.')) return;
+                if (this.db.remote) await this.db.clearOrders();
+                else for (const o of this.orders) await this.db.delete('orders', o.id);
+                await this.afterChange(); this.toast('Orders cleared');
+            }
+
+            /* ---------- SETTINGS ---------- */
+            tplSettings() {
+                return `<div class="${this.C}">
+                    <h4 class="font-bold text-sm text-cyan-300">Site Logo</h4>
+                    <img src="${this.esc(this.settings.logo)}" class="w-16 h-16 rounded-xl object-cover border border-slate-700">
+                    <div class="flex flex-wrap gap-2 items-center"><input id="fLogoFile" type="file" accept="image/*" class="text-xs text-slate-300 max-w-full"><input id="fLogoUrl" class="${this.F} flex-1 min-w-[140px]" placeholder="or logo URL"></div>
+                    <button onclick="app.saveSetting('site_logo','fLogoFile','fLogoUrl',200,'image/png')" class="${this.B}bg-blue-600 text-white px-4 py-2">Save Logo</button>
+                </div>
+                <div class="${this.C}">
+                    <h4 class="font-bold text-sm text-cyan-300">KHQR Payment Code</h4>
+                    <img src="${this.esc(this.settings.khqr)}" class="w-32 rounded-xl object-contain border border-slate-700 bg-slate-950">
+                    <div class="flex flex-wrap gap-2 items-center"><input id="fQrFile" type="file" accept="image/*" class="text-xs text-slate-300 max-w-full"><input id="fQrUrl" class="${this.F} flex-1 min-w-[140px]" placeholder="or KHQR image URL"></div>
+                    <button onclick="app.saveSetting('khqr_image','fQrFile','fQrUrl',800,'image/png')" class="${this.B}bg-blue-600 text-white px-4 py-2">Save KHQR</button>
+                </div>
+                <div class="${this.C}">
+                    <h4 class="font-bold text-sm text-cyan-300">Change Admin Password</h4>
+                    <input id="fPassNew" type="password" class="${this.F}" placeholder="New password (min 6 characters)" autocomplete="new-password">
+                    <input id="fPassNew2" type="password" class="${this.F}" placeholder="Confirm new password" autocomplete="new-password">
+                    <button onclick="app.changePassword()" class="${this.B}bg-blue-600 text-white px-4 py-2">Update Password</button>
+                </div>`;
+            }
+            async saveSetting(key, fileId, urlId, max, type) {
+                const v = await this.pickImage(fileId, urlId, max, type);
+                if (v === null) return;
+                if (!v) return this.toast('Choose an image or enter a URL', true);
+                if (await this.save('settings', { key, value: v })) { await this.afterChange(); this.toast('Saved ✓'); }
+            }
+            async changePassword() {
+                const p1 = document.getElementById('fPassNew').value, p2 = document.getElementById('fPassNew2').value;
+                if (p1.length < 6) return this.toast('Password must be at least 6 characters', true);
+                if (p1 !== p2) return this.toast('Passwords do not match', true);
+                if (await this.save('settings', { key: 'admin_password', value: p1 })) { await this.afterChange(); this.toast('Password updated ✓'); }
             }
         }
 
@@ -1103,120 +1471,84 @@
     })();
     </script>
 
-    <!-- --- DOLLAR RAIN SMOOTH CANVAS ANIMATION ($\text{💸} / \$$) --- -->
+    <!-- --- 💸 DOLLAR RAIN CANVAS ANIMATION --- -->
     <script>
     (function(){
-        const reduce = matchMedia('(prefers-reduced-motion: reduce)');
-        if (reduce.matches) return;
-
+        const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
         const c = document.createElement('canvas');
         c.id = 'moneyRain';
+        c.setAttribute('aria-hidden', 'true');
         document.body.appendChild(c);
         const ctx = c.getContext('2d');
-        
-        let W, H, D, items = [], sprites = [], last = 0, on = true;
+        let W, H, D, items = [], sprites = [], last = 0, raf = 0, rt;
 
-        const createDollarSprite = (size, type) => {
-            const p = Math.ceil(size * 1.6 * D);
+        const sprite = (size, glyph, color) => {
+            const p = Math.ceil(size * 1.8 * D);
             const s = document.createElement('canvas');
             s.width = s.height = p;
             const g = s.getContext('2d');
-            g.font = `bold ${size * D}px "Rajdhani", "Apple Color Emoji", "Segoe UI Emoji", sans-serif`;
             g.textAlign = 'center';
             g.textBaseline = 'middle';
-            
-            if (type === 0) {
-                g.fillStyle = '#06B6D4'; // Cyan Dollar Sign
-                g.shadowColor = 'rgba(6, 182, 212, 0.8)';
-                g.shadowBlur = 8 * D;
-                g.fillText('$', p / 2, p / 2);
-            } else if (type === 1) {
-                g.fillStyle = '#3B82F6'; // Blue Dollar Sign
-                g.shadowColor = 'rgba(59, 130, 246, 0.8)';
-                g.shadowBlur = 8 * D;
-                g.fillText('$', p / 2, p / 2);
+            if (color) {
+                g.font = `800 ${size * D}px Rajdhani, sans-serif`;
+                g.fillStyle = color; g.shadowColor = color; g.shadowBlur = 8 * D;
             } else {
-                g.fillText('\u{1F4B8}', p / 2, p / 2); // 💸 Dollar Fly Emoji
+                g.font = `${size * D}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
             }
+            g.fillText(glyph, p / 2, p / 2);
             return s;
         };
 
-        const spawnItem = (init) => {
-            const k = Math.random() * 3 | 0;
-            return {
-                x: Math.random() * W,
-                y: init ? Math.random() * H : -50,
-                k: k,
-                v: 45 + Math.random() * 55 + k * 12,
-                sw: Math.random() * 6.28,
-                sa: 12 + Math.random() * 24,
-                r: Math.random() * 6.28,
-                rv: (Math.random() - 0.5) * 1.2,
-                a: 0.5 + Math.random() * 0.45
-            };
-        };
+        const spawn = (init) => ({
+            x: Math.random() * W,
+            y: init ? Math.random() * H : -40 - Math.random() * H * 0.3,
+            k: Math.random() < 0.7 ? (Math.random() * 3 | 0) : 3 + (Math.random() * 2 | 0),
+            v: (40 + Math.random() * 60) * (calm ? 0.5 : 1),
+            sw: Math.random() * 6.28,
+            sf: 0.6 + Math.random() * 0.9,
+            sa: 10 + Math.random() * 22,
+            r: Math.random() * 6.28,
+            rv: (Math.random() - 0.5) * 1.4,
+            a: 0.55 + Math.random() * 0.4
+        });
 
         const resize = () => {
             D = Math.min(devicePixelRatio || 1, 2);
-            W = innerWidth;
-            H = innerHeight;
-            c.width = W * D;
-            c.height = H * D;
-            
+            W = innerWidth; H = innerHeight;
+            c.width = W * D; c.height = H * D;
             sprites = [
-                createDollarSprite(18, 0),
-                createDollarSprite(24, 1),
-                createDollarSprite(28, 2)
+                sprite(20, '\u{1F4B8}'), sprite(26, '\u{1F4B8}'), sprite(32, '\u{1F4B8}'),
+                sprite(22, '$', '#06B6D4'), sprite(26, '$', '#3B82F6')
             ];
-            
-            const count = W < 640 ? 18 : 32;
-            items = Array.from({ length: count }, () => spawnItem(true));
+            const n = calm ? 8 : (W < 640 ? 18 : 32);
+            items = Array.from({ length: n }, () => spawn(true));
         };
 
-        const renderFrame = (time) => {
-            if (!on) return;
-            const dt = Math.min((time - last) / 1000, 0.05);
-            last = time;
-            
+        const frame = (t) => {
+            const dt = Math.min((t - last) / 1000, 0.05) || 0.016;
+            last = t;
             ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.clearRect(0, 0, c.width, c.height);
-
             for (const p of items) {
-                p.y += p.v * dt;
-                p.sw += dt * 1.5;
-                p.r += p.rv * dt;
-
-                if (p.y > H + 50) {
-                    Object.assign(p, spawnItem(false));
-                }
-
-                const s = sprites[p.k];
-                const h = s.width / 2;
-                
+                p.y += p.v * dt; p.sw += dt * p.sf; p.r += p.rv * dt;
+                if (p.y > H + 40) Object.assign(p, spawn(false));
+                const s = sprites[p.k], h = s.width / 2;
                 ctx.setTransform(1, 0, 0, 1, (p.x + Math.sin(p.sw) * p.sa) * D, p.y * D);
-                ctx.rotate(p.r * 0.3);
+                ctx.rotate(Math.sin(p.r) * 0.5);
                 ctx.globalAlpha = p.a;
                 ctx.drawImage(s, -h, -h);
             }
-            requestAnimationFrame(renderFrame);
+            raf = requestAnimationFrame(frame);
         };
 
-        let rt;
-        addEventListener('resize', () => {
-            clearTimeout(rt);
-            rt = setTimeout(resize, 200);
-        });
-        
+        addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(resize, 150); });
         document.addEventListener('visibilitychange', () => {
-            on = !document.hidden;
-            if (on) {
-                last = performance.now();
-                requestAnimationFrame(renderFrame);
-            }
+            cancelAnimationFrame(raf);
+            if (!document.hidden) { last = performance.now(); raf = requestAnimationFrame(frame); }
         });
-
         resize();
-        requestAnimationFrame(renderFrame);
+        raf = requestAnimationFrame(frame);
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(resize);
     })();
     </script>
 </body>
