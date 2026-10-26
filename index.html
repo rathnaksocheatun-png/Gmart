@@ -474,10 +474,10 @@
                         <div class="w-48 h-56 mx-auto bg-slate-900 rounded-xl overflow-hidden flex items-center justify-center">
                             <img id="khqrDisplayImg" src="https://placehold.co/300x400/0f172a/06b6d4?text=KHQR+PAYMENT" alt="Bakong KHQR Code" class="w-full h-full object-contain">
                         </div>
-                        <p class="text-[10px] text-slate-400 mt-1 font-semibold">G martt Verified Merchant QR</p>
+                        <p class="text-[10px] text-slate-400 mt-1 font-semibold">G mart Verified Merchant QR</p>
                     </div>
                     <div class="text-xs bg-red-950/60 text-red-300 border border-red-500/40 p-2 rounded-lg font-semibold">
-                        សូមផ្ញើររូបភាពវិក្ក័យបត្រទូទាត់ប្រាក់ (Payment Receipt) មកកាន់ Admin
+                        សូមផ្ញើររូបភាពវិក្ក័យបត្រទូទាត់ប្រាក់ (Payment Receipt) មកកាន់ Admin ដោយចុចប៊ូតុងខាងក្រោម
                     </div>
                 </div>
                 <div class="space-y-2.5 pt-2">
@@ -607,14 +607,14 @@
     <!-- FOOTER -->
     <footer class="mt-12 bg-slate-900 border-t border-blue-500/20 py-8 text-center text-xs text-slate-400">
         <div class="max-w-6xl mx-auto px-4 space-y-3">
-            <h2 class="gaming-font text-2xl font-extrabold text-white">G martt</h2>
-            <p class="max-w-md mx-auto text-slate-400">The most trusted and secure gaming account marketplace. Instant delivery, verified stock, and 24/7 support.</p>
-            <p class="text-[11px] text-slate-500">© 2026 G martt. All Rights Reserved.</p>
+            <h2 class="gaming-font text-2xl font-extrabold text-white">G mart ពួកយើងសូមអរគុណចំពោះការទុកចិត្តរបស់បងប្អូន 🙏🏼❤️‍🔥</h2>
+            <p class="max-w-md mx-auto text-slate-400">រាល់ការទិញ Account Game ចេញពី G mart ពួកយើងតែងតែផ្ដល់ជូននូវ Gmail Bind ផ្ទាល់ដើម្បីឲ្យបងប្អូនងាយស្រួលយកទៅលក់បន្តទៀតបាន</p>
+            <p class="text-[11px] text-slate-500">© 2026 G mart. All Rights Reserved.</p>
         </div>
     </footer>
 
     <!-- --- MUSIC FLOATING PLAYER HTML WIDGET (RIGHT SIDE) --- -->
-    <button class="mfab" id="mfab" type="button" aria-expanded="false">🎵 ចម្រៀង</button>
+    <button class="mfab" id="mfab" type="button" aria-expanded="false">🎵 Music for u</button>
     <div class="mp off" id="mp">
         <h3>🎶 បទចម្រៀង 10 បទ</h3>
         <small>ចុចចាក់ ឬប្តូរបទចម្រៀង។ ចប់មួយបទ វានឹងចាក់បទបន្ទាប់ដោយស្វ័យប្រវត្តិរហូតដល់បទទី ១០។</small>
@@ -1051,7 +1051,7 @@
             sendTelegramReport() {
                 if (!this.activeAccount) return;
                 const name = document.getElementById('customerNameInput').value.trim() || 'N/A';
-                const text = `សួស្ដីបង! ខ្ញុំបាន pay លុយរួចរាល់ហើយ\nNAME: ${name}\nACCOUNT: ${this.activeAccount.title}\nPRICE: $${this.activeAccount.price}`;
+                const text = `សួស្ដីបង $iik !👋🏻 ខ្ញុំបាន pay លុយរួចរាល់ហើយចាំបន្តិចខ្ញុំផ្ញើរវិក្ក័យបត្រ pay លុយឲ្យ។ ជួយដាក់ Account Game នេះឲ្យខ្ញុំផងកុំឲ្យម៉ូយសំណព្វចិត្តសំណព្វបេះដូងម្នាក់នេះចាំបងយូរពេក 😋\nNAME: ${name}\nACCOUNT: ${this.activeAccount.title}\nPRICE: $${this.activeAccount.price}`;
                 window.open(`https://t.me/zicksiik?text=${encodeURIComponent(text)}`, '_blank');
             }
 
