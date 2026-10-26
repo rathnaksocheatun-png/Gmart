@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>G martt - Game Account Marketplace</title>
+    <!-- Google Fonts: Inter, Rajdhani & Kantumruy Pro -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Rajdhani:wght@600;700;800&family=Kantumruy+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brandBlue: '#3B82F6',
+                        brandCyan: '#06B6D4',
+                        brandPurple: '#8B5CF6',
+                        cardBg: '#0F172A',
+                        darkText: '#F8FAFC'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'Kantumruy Pro', 'sans-serif'],
+                        gaming: ['Rajdhani', 'Kantumruy Pro', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Custom CSS Styles & Theme Matched to Logo -->
+    <style>
+        :root {
+            --blue-primary: #3B82F6;
+            --cyan-accent: #06B6D4;
+            --purple-glow: #8B5CF6;
+        }
+
+        body {
+            background-color: #030712;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.22) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.22) 0px, transparent 50%),
+                radial-gradient(at 50% 100%, rgba(6, 182, 212, 0.18) 0px, transparent 50%);
+            background-attachment: fixed;
+            font-family: 'Inter', 'Kantumruy Pro', sans-serif;
+            color: #F8FAFC;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .gaming-font {
+            font-family: 'Rajdhani', 'Kantumruy Pro', sans-serif;
+        }
+
+        /* Glassmorphism Header & Cards */
+        .glass-header {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid rgba(59, 130, 246, 0.3) !important;
+        }
+
+        #bannerSection {
+            border-radius: 1.5rem;
+            border: 1px solid rgba(59, 130, 246, 0.4);
+            box-shadow: 0 20px 35px -18px rgba(59, 130, 246, 0.5);
+        }
+
+        main h2.gaming-font {
+            position: relative;
+            padding-bottom: 0.4rem;
+        }
+        main h2.gaming-font::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            width: 40px;
+            height: 3px;
+            border-radius: 3px;
+            background: linear-gradient(90deg, var(--blue-primary), var(--cyan-accent));
+        }
+
+        #accountsGrid > div {
+            background-color: #0F172A;
+            border-radius: 1.25rem;
+            border: 1px solid rgba(59, 130, 246, 0.25);
+            transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s;
+        }
+        #accountsGrid > div:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 18px 32px -16px rgba(6, 182, 212, 0.4);
+            border-color: rgba(6, 182, 212, 0.6);
+        }
+
+        /* Animated Glowing Button Base */
+        .fire-glow-btn {
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.5), inset 0 0 10px rgba(6, 182, 212, 0.3);
+            border: 1px solid rgba(6, 182, 212, 0.8);
+            animation: pulse-glow 2s infinite ease-in-out;
+        }
+        .fire-glow-btn:active {
+            transform: scale(0.97);
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% {
+                box-shadow: 0 0 12px rgba(59, 130, 246, 0.6), inset 0 0 8px rgba(6, 182, 212, 0.4);
+            }
+            50% {
+                box-shadow: 0 0 22px rgba(6, 182, 212, 0.9), 0 0 30px rgba(139, 92, 246, 0.6), inset 0 0 14px rgba(59, 130, 246, 0.6);
+            }
+        }
+
+        .fire-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .btn-text-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .bottom-sheet-enter {
+            animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #06B6D4;
+            border-radius: 50%;
+            box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.7);
+            animation: pulse-cyan 1.5s infinite;
+        }
+        @keyframes pulse-cyan {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(6, 182, 212, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(6, 182, 212, 0); }
+        }
+
+        /* --- MONEY RAIN CANVAS OVERLAY --- */
+        #moneyRain {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 30;
+        }
+
+        /* --- MUSIC FLOATING PLAYER STYLES (RIGHT SIDE) --- */
+        .mfab {
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            z-index: 99;
+            background: linear-gradient(135deg, #3B82F6, #06B6D4);
+            color: #ffffff;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 999px;
+            font-weight: 700;
+            font-size: 13px;
+            box-shadow: 0 10px 25px rgba(6, 182, 212, 0.4);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .mfab:hover {
+            transform: scale(1.05);
+            box-shadow: 0 15px 30px rgba(6, 182, 212, 0.6);
+        }
+        .mp {
+            position: fixed;
+            right: 20px;
+            bottom: 80px;
+            z-index: 99;
+            width: 320px;
+            max-width: calc(100vw - 40px);
+            background: #0F172A;
+            border: 1px solid rgba(59, 130, 246, 0.4);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            padding: 16px;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            transform-origin: bottom right;
+        }
+        .mp.off {
+            opacity: 0;
+            transform: scale(0.9) translateY(20px);
+            pointer-events: none;
+        }
+        .mp h3 {
+            font-size: 15px;
+            font-weight: 800;
+            color: #F8FAFC;
+            margin-bottom: 4px;
+        }
+        .mp small {
+            display: block;
+            font-size: 11px;
+            color: #94A3B8;
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+        .mp audio {
+            width: 100%;
+            height: 36px;
+            margin-bottom: 12px;
+        }
+        .mp ol {
+            max-height: 220px;
+            overflow-y: auto;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .mp ol li button {
+            width: 100%;
+            text-align: left;
+            padding: 8px 10px;
+            background: #1E293B;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #E2E8F0;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .mp ol li button:hover {
+            background: #334155;
+            border-color: #06B6D4;
+        }
+        .mp ol li button.sel {
+            background: linear-gradient(135deg, #3B82F6, #06B6D4);
+            color: #ffffff;
+            border-color: transparent;
+        }
+        .mtoast {
+            position: fixed;
+            right: 20px;
+            bottom: 85px;
+            z-index: 98;
+            background: #1E293B;
+            color: #F8FAFC;
+            border: 1px solid rgba(6, 182, 212, 0.4);
+            padding: 8px 14px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .mtoast.hide {
+            display: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col pb-12">
+
+    <!-- HEADER -->
+    <header class="sticky top-0 z-40 glass-header shadow-xs transition-all duration-300">
+        <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3 cursor-pointer" onclick="app.showHome()">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 p-0.5 shadow-md shadow-cyan-500/20">
+                    <img id="siteLogoImg" src="https://placehold.co/100x100/0f172a/06b6d4?text=GM" alt="G martt Logo" class="w-full h-full object-cover rounded-[10px]" onerror="this.src='https://placehold.co/100x100/0f172a/06b6d4?text=GM'">
+                </div>
+                <div>
+                    <h1 id="siteNameHeader" class="gaming-font text-2xl font-extrabold tracking-wider bg-gradient-to-r from-blue-400 via-cyan-400 to-purple-400 bg-clip-text text-transparent">
+                        G martt
+                    </h1>
+                    <div class="flex items-center space-x-1.5">
+                        <span class="live-dot"></span>
+                        <span class="text-[10px] font-semibold text-cyan-400 uppercase tracking-wider">Live Marketplace</span>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button onclick="app.openAdminModal()" class="p-2 rounded-full bg-slate-800 text-cyan-400 hover:bg-slate-700 transition-colors border border-blue-500/35" title="Admin Panel">
+                    <i class="fa-solid fa-user-shield text-sm"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT CONTAINER -->
+    <main class="max-w-6xl mx-auto px-4 pt-4 flex-grow w-full space-y-6">
+
+        <!-- BANNER SECTION -->
+        <section id="bannerSection" class="relative rounded-2xl overflow-hidden shadow-lg bg-slate-900 aspect-[21/9] sm:aspect-[25/8]">
+            <div id="bannerCarousel" class="w-full h-full relative flex transition-transform duration-500 ease-out"></div>
+            <button onclick="app.prevBanner()" class="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-md transition">
+                <i class="fa-solid fa-chevron-left text-xs"></i>
+            </button>
+            <button onclick="app.nextBanner()" class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-md transition">
+                <i class="fa-solid fa-chevron-right text-xs"></i>
+            </button>
+            <div id="bannerIndicators" class="absolute bottom-3 left-1/2 -translate-x-1/2 flex space-x-1.5 z-10"></div>
+        </section>
+
+        <!-- GAME CATEGORY SECTION -->
+        <section>
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="gaming-font text-xl font-extrabold text-slate-100 tracking-wide flex items-center">
+                    <i class="fa-solid fa-gamepad text-cyan-400 mr-2"></i> GAME CATEGORIES
+                </h2>
+                <span id="categoryCountBadge" class="text-xs bg-blue-950 text-cyan-300 border border-blue-500/30 px-2.5 py-0.5 rounded-full font-bold">4 Categories</span>
+            </div>
+            <div id="categoriesContainer" class="flex items-center space-x-3 overflow-x-auto pb-2 pt-1 no-scrollbar"></div>
+        </section>
+
+        <!-- SEE ALL ACCOUNTS SECTION -->
+        <section class="space-y-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="gaming-font text-2xl font-extrabold text-slate-100 tracking-wide">
+                        SEE ALL ACCOUNTS
+                    </h2>
+                    <p class="text-xs text-slate-400">Verified & 100% Instant Delivery Gaming Accounts</p>
+                </div>
+                <div class="relative">
+                    <input type="text" id="searchInput" oninput="app.filterAccounts()" placeholder="Search accounts..." class="w-36 sm:w-48 pl-8 pr-3 py-1.5 text-xs bg-slate-900 border border-blue-500/30 text-slate-100 rounded-full focus:outline-none focus:ring-2 focus:ring-cyan-500 shadow-xs">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                </div>
+            </div>
+            <div id="accountsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+            <div id="noAccountsState" class="hidden text-center py-12 bg-slate-900 rounded-2xl border border-dashed border-blue-500/30">
+                <i class="fa-solid fa-ghost text-4xl text-cyan-400 mb-2"></i>
+                <p class="text-slate-300 font-semibold text-sm">No accounts found</p>
+            </div>
+        </section>
+
+        <!-- SERVICE PACKAGES -->
+        <section class="pt-4 border-t border-blue-500/20">
+            <div class="mb-4 text-center sm:text-left">
+                <h2 class="gaming-font text-2xl font-extrabold text-slate-100 tracking-wide">
+                    SERVICE PACKAGES
+                </h2>
+                <p class="text-xs text-slate-400">Explore our professional gaming assistance & admin support services</p>
+            </div>
+            <div id="servicesGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4"></div>
+            <div class="mt-6 bg-slate-900 p-4 rounded-2xl border border-blue-500/30 shadow-xs">
+                <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3 text-center sm:text-left">Official Contact Channels</h3>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+                    <a href="https://t.me/zicksiik" target="_blank" class="flex items-center justify-center space-x-1.5 p-2 bg-sky-950 text-sky-300 border border-sky-500/30 rounded-xl hover:bg-sky-900 transition text-xs font-semibold">
+                        <i class="fa-brands fa-telegram"></i> <span>Telegram Bot</span>
+                    </a>
+                    <a href="#" class="flex items-center justify-center space-x-1.5 p-2 bg-blue-950 text-blue-300 border border-blue-500/30 rounded-xl hover:bg-blue-900 transition text-xs font-semibold">
+                        <i class="fa-solid fa-globe"></i> <span>Website</span>
+                    </a>
+                    <a href="https://t.me/zicksiik" target="_blank" class="flex items-center justify-center space-x-1.5 p-2 bg-amber-950 text-amber-300 border border-amber-500/30 rounded-xl hover:bg-amber-900 transition text-xs font-semibold">
+                        <i class="fa-solid fa-crown"></i> <span>Owner</span>
+                    </a>
+                    <a href="https://t.me/zicksiik" target="_blank" class="flex items-center justify-center space-x-1.5 p-2 bg-indigo-950 text-indigo-300 border border-indigo-500/30 rounded-xl hover:bg-indigo-900 transition text-xs font-semibold">
+                        <i class="fa-solid fa-headset"></i> <span>Admin 01</span>
+                    </a>
+                    <a href="https://www.facebook.com/share/1CGi7f9kEZ/?mibextid=wwXIfr" target="_blank" class="flex items-center justify-center space-x-1.5 p-2 bg-blue-950 text-blue-300 border border-blue-500/30 rounded-xl hover:bg-blue-900 transition text-xs font-semibold">
+                        <i class="fa-brands fa-facebook"></i> <span>Admin 02</span>
+                    </a>
+                    <a href="https://www.facebook.com/share/1CGi7f9kEZ/?mibextid=wwXIfr" target="_blank" class="flex items-center justify-center space-x-1.5 p-2 bg-cyan-950 text-cyan-300 border border-cyan-500/30 rounded-xl hover:bg-cyan-900 transition text-xs font-semibold">
+                        <i class="fa-brands fa-facebook-messenger"></i> <span>Admin 03</span>
+                    </a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ACCOUNT DETAILS MODAL -->
+    <div id="accountModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-end sm:items-center justify-center hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-slate-900 text-slate-100 w-full max-w-lg rounded-t-3xl sm:rounded-2xl max-h-[90vh] flex flex-col overflow-hidden bottom-sheet-enter shadow-2xl border border-blue-500/40">
+            <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950">
+                <div class="flex items-center space-x-2">
+                    <span id="modalGameBadge" class="px-2.5 py-0.5 rounded-md bg-blue-950 text-blue-300 border border-blue-500/40 text-xs font-bold uppercase">Free Fire</span>
+                    <span id="modalLevelBadge" class="px-2.5 py-0.5 rounded-md bg-slate-800 text-slate-300 text-xs font-bold">LVL 70</span>
+                </div>
+                <button onclick="app.closeAccountModal()" class="w-8 h-8 rounded-full bg-slate-800 text-slate-300 hover:bg-slate-700 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="p-4 overflow-y-auto space-y-4">
+                <div class="relative rounded-xl overflow-hidden aspect-video bg-slate-950 group border border-slate-800">
+                    <img id="modalMainImage" src="" alt="Account Preview" class="w-full h-full object-contain">
+                    <div id="modalThumbnails" class="absolute bottom-2 left-2 right-2 flex space-x-2 overflow-x-auto p-1 bg-black/60 backdrop-blur-md rounded-lg no-scrollbar"></div>
+                </div>
+                <div class="flex items-start justify-between">
+                    <div>
+                        <h3 id="modalAccountTitle" class="gaming-font text-xl font-bold text-white">Rare VIP Collection Account</h3>
+                        <p id="modalAccountId" class="text-xs text-slate-400 font-mono">ID: #FF-88231</p>
+                    </div>
+                    <div class="text-right">
+                        <div id="modalAccountPrice" class="gaming-font text-2xl font-black text-cyan-400">$25.00</div>
+                        <span id="modalStockStatus" class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-950 text-cyan-300 border border-blue-500/30 uppercase">Available</span>
+                    </div>
+                </div>
+                <div class="space-y-1">
+                    <h4 class="text-xs font-bold text-slate-300 uppercase">Account Description</h4>
+                    <p id="modalAccountDesc" class="text-xs text-slate-300 leading-relaxed bg-slate-950 p-3 rounded-xl border border-slate-800"></p>
+                </div>
+            </div>
+            <div class="p-4 border-t border-slate-800 bg-slate-950">
+                <button id="modalBuyBtn" onclick="app.proceedToCheckout()" class="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 text-white font-extrabold gaming-font tracking-wider text-lg fire-glow-btn flex items-center justify-center space-x-2">
+                    <canvas id="fireCanvasModal" class="fire-canvas"></canvas>
+                    <span class="btn-text-content flex items-center"><i class="fa-solid fa-cart-shopping mr-2"></i> BUY NOW</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CHECKOUT MODAL -->
+    <div id="checkoutModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-slate-900 text-slate-100 w-full max-w-md rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] border border-blue-500/40">
+            <div class="bg-gradient-to-r from-blue-600 to-cyan-600 p-4 text-white flex items-center justify-between">
+                <div>
+                    <h3 class="gaming-font text-lg font-bold tracking-wide">ORDER & KHQR PAYMENT</h3>
+                    <p class="text-[11px] text-blue-100">Order ID: <span id="checkoutOrderId" class="font-mono font-bold">GM-20260926-XXXX</span></p>
+                </div>
+                <button onclick="app.closeCheckoutModal()" class="text-blue-100 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div id="checkoutStep1" class="p-4 overflow-y-auto space-y-4">
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-3">
+                    <label class="block">
+                        <span class="text-xs font-bold text-slate-300 uppercase">Your Name / Username <span class="text-red-400">*</span></span>
+                        <input type="text" id="customerNameInput" placeholder="Enter full name or telegram username" class="mt-1 w-full px-3 py-2 text-sm bg-slate-900 text-slate-100 border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                    </label>
+                    <label class="block">
+                        <span class="text-xs font-bold text-slate-300 uppercase">Game ID / In-Game Name (Optional)</span>
+                        <input type="text" id="customerGameIdInput" placeholder="e.g. 592819202" class="mt-1 w-full px-3 py-2 text-sm bg-slate-900 text-slate-100 border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                    </label>
+                </div>
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs space-y-1.5">
+                    <div class="flex justify-between text-slate-400"><span>Game:</span><strong id="summaryGame" class="text-slate-200">Free Fire</strong></div>
+                    <div class="flex justify-between text-slate-400"><span>Account Title:</span><strong id="summaryTitle" class="text-slate-200">VIP Account</strong></div>
+                    <div class="flex justify-between text-slate-400"><span>Level:</span><strong id="summaryLevel" class="text-slate-200">LVL 70</strong></div>
+                    <div class="flex justify-between text-slate-200 font-bold border-t border-slate-800 pt-1 text-sm">
+                        <span>Total Payable:</span><span id="summaryPrice" class="text-cyan-400">$25.00</span>
+                    </div>
+                </div>
+                <button onclick="app.submitOrderAndShowPayment()" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition shadow-md flex items-center justify-center">
+                    <span>Confirm & Get KHQR Payment Code</span> <i class="fa-solid fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+            <div id="checkoutStep2" class="p-4 overflow-y-auto space-y-4 hidden">
+                <div class="text-center space-y-2">
+                    <p class="text-xs text-slate-300">Scan KHQR with any Banking App (ABA, Aceleda, Wing, etc.)</p>
+                    <div class="inline-block p-3 bg-slate-950 border-2 border-cyan-500 rounded-2xl shadow-md relative">
+                        <div class="w-48 h-56 mx-auto bg-slate-900 rounded-xl overflow-hidden flex items-center justify-center">
+                            <img id="khqrDisplayImg" src="https://placehold.co/300x400/0f172a/06b6d4?text=KHQR+PAYMENT" alt="Bakong KHQR Code" class="w-full h-full object-contain">
+                        </div>
+                        <p class="text-[10px] text-slate-400 mt-1 font-semibold">G martt Verified Merchant QR</p>
+                    </div>
+                    <div class="text-xs bg-red-950/60 text-red-300 border border-red-500/40 p-2 rounded-lg font-semibold">
+                        សូមផ្ញើររូបភាពវិក្ក័យបត្រទូទាត់ប្រាក់ (Payment Receipt) មកកាន់ Admin
+                    </div>
+                </div>
+                <div class="space-y-2.5 pt-2">
+                    <button onclick="app.sendTelegramReport()" class="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 text-white font-extrabold gaming-font tracking-wider text-sm fire-glow-btn flex items-center justify-center space-x-2">
+                        <canvas id="fireCanvasTg" class="fire-canvas"></canvas>
+                        <span class="btn-text-content flex items-center"><i class="fa-brands fa-telegram text-lg mr-2"></i> Send Report to Telegram</span>
+                    </button>
+                    <button onclick="app.sendPageReport()" class="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 text-white font-extrabold gaming-font tracking-wider text-sm fire-glow-btn flex items-center justify-center space-x-2">
+                        <canvas id="fireCanvasFb" class="fire-canvas"></canvas>
+                        <span class="btn-text-content flex items-center"><i class="fa-brands fa-facebook text-lg mr-2"></i> Send Report to Page</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADMIN PANEL MODAL -->
+    <div id="adminModal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 hidden">
+        <div class="bg-slate-900 text-slate-100 w-full max-w-4xl h-[90vh] rounded-2xl overflow-hidden shadow-2xl flex flex-col border border-blue-500/40">
+            <div class="bg-slate-950 text-white p-4 flex items-center justify-between border-b border-slate-800">
+                <div class="flex items-center space-x-3">
+                    <i class="fa-solid fa-user-shield text-cyan-400 text-xl"></i>
+                    <div>
+                        <h2 class="gaming-font text-xl font-bold tracking-wider">G martt ADMIN CONTROL CENTER</h2>
+                        <span id="adminAuthStatus" class="text-[10px] text-slate-400">Status: Locked</span>
+                    </div>
+                </div>
+                <button onclick="app.closeAdminModal()" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div id="adminLoginForm" class="flex-grow p-6 flex items-center justify-center bg-slate-950">
+                <div class="w-full max-w-md bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl space-y-4">
+                    <div class="text-center space-y-1">
+                        <div class="w-12 h-12 bg-blue-950 text-cyan-400 rounded-full flex items-center justify-center mx-auto text-xl mb-2 border border-blue-500/30">
+                            <i class="fa-solid fa-lock"></i>
+                        </div>
+                        <h3 class="gaming-font text-xl font-bold text-white">AUTHENTICATION REQUIRED</h3>
+                    </div>
+                    <form onsubmit="app.handleAdminLogin(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-300 uppercase mb-1">ADMIN PASSWORD</label>
+                            <input type="password" id="adminPasswordInput" placeholder="Enter admin password" class="w-full px-3 py-2.5 text-sm bg-slate-950 text-slate-100 border border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                        </div>
+                        <button type="submit" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition shadow-md">
+                            Login to Admin Panel
+                        </button>
+                    </form>
+                </div>
+            </div>
+            <div id="adminDashboard" class="flex-grow flex flex-col sm:flex-row overflow-hidden hidden bg-slate-950">
+                <div class="w-full sm:w-56 bg-slate-900 text-slate-300 flex sm:flex-col overflow-x-auto sm:overflow-y-auto no-scrollbar shrink-0 border-r border-slate-800">
+                    <nav class="p-2 space-y-1 flex sm:flex-col w-full min-w-max sm:min-w-0">
+                        <button onclick="app.switchAdminTab('overview')" class="admin-tab-btn active w-full flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold hover:bg-slate-800 transition text-left">
+                            <i class="fa-solid fa-chart-line text-cyan-400 w-4"></i><span>Overview</span>
+                        </button>
+                        <button onclick="app.switchAdminTab('accounts')" class="admin-tab-btn w-full flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold hover:bg-slate-800 transition text-left">
+                            <i class="fa-solid fa-gamepad text-blue-400 w-4"></i><span>Accounts</span>
+                        </button>
+                        <button onclick="app.switchAdminTab('categories')" class="admin-tab-btn w-full flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold hover:bg-slate-800 transition text-left">
+                            <i class="fa-solid fa-list-check text-purple-400 w-4"></i><span>Categories</span>
+                        </button>
+                        <button onclick="app.switchAdminTab('banners')" class="admin-tab-btn w-full flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold hover:bg-slate-800 transition text-left">
+                            <i class="fa-solid fa-images text-teal-400 w-4"></i><span>Banners</span>
+                        </button>
+                        <button onclick="app.switchAdminTab('services')" class="admin-tab-btn w-full flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold hover:bg-slate-800 transition text-left">
+                            <i class="fa-solid fa-cubes text-indigo-400 w-4"></i><span>Services</span>
+                        </button>
+                        <button onclick="app.switchAdminTab('orders')" class="admin-tab-btn w-full flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold hover:bg-slate-800 transition text-left">
+                            <i class="fa-solid fa-receipt text-rose-400 w-4"></i><span>Orders</span>
+                        </button>
+                        <button onclick="app.switchAdminTab('settings')" class="admin-tab-btn w-full flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold hover:bg-slate-800 transition text-left">
+                            <i class="fa-solid fa-gear text-slate-400 w-4"></i><span>Site & KHQR</span>
+                        </button>
+                    </nav>
+                    <div class="mt-auto p-3 hidden sm:block border-t border-slate-800">
+                        <button onclick="app.adminLogout()" class="w-full py-2 bg-red-600/20 text-red-300 hover:bg-red-600 hover:text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5">
+                            <i class="fa-solid fa-right-from-bracket"></i> <span>Logout Admin</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex-grow p-4 sm:p-6 overflow-y-auto space-y-6">
+                    <div id="adminTabOverview" class="admin-tab-content space-y-6">
+                        <h3 class="text-lg font-bold text-white">Dashboard Overview</h3>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-xs">
+                                <p class="text-xs text-slate-400 font-semibold uppercase">Total Accounts</p>
+                                <h4 id="statTotalAccounts" class="text-2xl font-black text-white mt-1">0</h4>
+                            </div>
+                            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-xs">
+                                <p class="text-xs text-slate-400 font-semibold uppercase">Available Stock</p>
+                                <h4 id="statAvailableAccounts" class="text-2xl font-black text-cyan-400 mt-1">0</h4>
+                            </div>
+                            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-xs">
+                                <p class="text-xs text-slate-400 font-semibold uppercase">Accounts Sold</p>
+                                <h4 id="statSoldAccounts" class="text-2xl font-black text-indigo-400 mt-1">0</h4>
+                            </div>
+                            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-xs">
+                                <p class="text-xs text-slate-400 font-semibold uppercase">Total Revenue</p>
+                                <h4 id="statTotalRevenue" class="text-2xl font-black text-cyan-400 mt-1">$0.00</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="adminTabAccounts" class="admin-tab-content space-y-6 hidden">
+                        <h3 class="text-lg font-bold text-white">Accounts Stock Management</h3>
+                    </div>
+                    <div id="adminTabCategories" class="admin-tab-content space-y-6 hidden">
+                        <h3 class="text-lg font-bold text-white">Categories Manager</h3>
+                    </div>
+                    <div id="adminTabBanners" class="admin-tab-content space-y-6 hidden">
+                        <h3 class="text-lg font-bold text-white">Banner Carousel Manager</h3>
+                    </div>
+                    <div id="adminTabServices" class="admin-tab-content space-y-6 hidden">
+                        <h3 class="text-lg font-bold text-white">Service Packages</h3>
+                    </div>
+                    <div id="adminTabOrders" class="admin-tab-content space-y-6 hidden">
+                        <h3 class="text-lg font-bold text-white">Customer Orders History</h3>
+                    </div>
+                    <div id="adminTabSettings" class="admin-tab-content space-y-6 hidden">
+                        <h3 class="text-lg font-bold text-white">Site Settings & KHQR Upload</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="mt-12 bg-slate-900 border-t border-blue-500/20 py-8 text-center text-xs text-slate-400">
+        <div class="max-w-6xl mx-auto px-4 space-y-3">
+            <h2 class="gaming-font text-2xl font-extrabold text-white">G martt</h2>
+            <p class="max-w-md mx-auto text-slate-400">The most trusted and secure gaming account marketplace. Instant delivery, verified stock, and 24/7 support.</p>
+            <p class="text-[11px] text-slate-500">© 2026 G martt. All Rights Reserved.</p>
+        </div>
+    </footer>
+
+    <!-- --- MUSIC FLOATING PLAYER HTML WIDGET (RIGHT SIDE) --- -->
+    <button class="mfab" id="mfab" type="button" aria-expanded="false">🎵 ចម្រៀង</button>
+    <div class="mp off" id="mp">
+        <h3>🎶 បទចម្រៀង 10 បទ</h3>
+        <small>ចុចចាក់ ឬប្តូរបទចម្រៀង។ ចប់មួយបទ វានឹងចាក់បទបន្ទាប់ដោយស្វ័យប្រវត្តិរហូតដល់បទទី ១០។</small>
+        <audio id="ma" controls autoplay></audio>
+        <ol>
+            <li><button type="button" data-i="0"><b>1</b> Tep Peth - May Dom Bon</button></li>
+            <li><button type="button" data-i="1"><b>2</b> Kwan - Song Sa Mdong Tt</button></li>
+            <li><button type="button" data-i="2"><b>3</b> Really Jing &amp; Para47199 - All In</button></li>
+            <li><button type="button" data-i="3"><b>4</b> Meezylcc - 4 A Minute</button></li>
+            <li><button type="button" data-i="4"><b>5</b> Yengky &amp; Mcsey - On The Floor</button></li>
+            <li><button type="button" data-i="5"><b>6</b> Mcsey &amp; The Chlam &amp; Oliver - Perfect</button></li>
+            <li><button type="button" data-i="6"><b>7</b> 2Mdie - 12 Flow</button></li>
+            <li><button type="button" data-i="7"><b>8</b> Really Jing - Bad Mood</button></li>
+            <li><button type="button" data-i="8"><b>9</b> Really Jing - Blvckvidow (Prod by :Ybben)</button></li>
+            <li><button type="button" data-i="9"><b>10</b> Vannda - Baby Mama</button></li>
+        </ol>
+    </div>
+    <div class="mtoast" id="mt">👆 ចុចប៊ូតុង "ចម្រៀង" ដើម្បីបង្ហាញផ្ទាំងចាក់បទចម្រៀង</div>
+
+    <!-- MAIN APP CONTROLLER SCRIPT (USING LOCALSTORAGE FALLBACK TO ENSURE DATA IS SHOWN) -->
+    <script>
+        class GMarttDatabase {
+            constructor() { this.t = ''; }
+            async init() {}
+            async getAll(store) {
+                try {
+                    const data = localStorage.getItem('gmartt_' + store);
+                    if (data) return JSON.parse(data);
+                } catch(e) {}
+                return [];
+            }
+            async put(store, item) {
+                let items = await this.getAll(store);
+                const idx = items.findIndex(i => (i.id && i.id === item.id) || (i.key && i.key === item.key));
+                if (idx >= 0) items[idx] = item;
+                else items.push(item);
+                localStorage.setItem('gmartt_' + store, JSON.stringify(items));
+                return item;
+            }
+            async delete(store, id) {
+                let items = await this.getAll(store);
+                items = items.filter(i => (i.id !== id) && (i.key !== id));
+                localStorage.setItem('gmartt_' + store, JSON.stringify(items));
+            }
+        }
+
+        class GMarttApp {
+            constructor() {
+                this.db = new GMarttDatabase();
+                this.syncChannel = new BroadcastChannel('gmartt_sync_channel');
+                this.categories = [];
+                this.accounts = [];
+                this.banners = [];
+                this.services = [];
+                this.orders = [];
+                this.settings = {};
+                this.selectedCategory = 'All';
+                this.activeAccount = null;
+                this.currentBannerIndex = 0;
+                this.bannerInterval = null;
+                this.isAdminAuthenticated = false;
+            }
+
+            async start() {
+                await this.db.init();
+                await this.loadInitialData();
+                this.setupRealtimeSync();
+                this.renderAll();
+            }
+
+            showHome() {
+                this.selectedCategory = 'All';
+                this.renderCategories();
+                this.renderAccounts();
+            }
+
+            async loadInitialData() {
+                this._seeded = (await this.db.getAll('settings')).some(s => s.key === 'seeded');
+                let cats = await this.db.getAll('categories');
+                if (cats.length === 0) {
+                    cats = [
+                        { id: '1', name: 'Free Fire', icon: 'https://placehold.co/100x100/0f172a/06b6d4?text=FF' },
+                        { id: '2', name: 'PUBG Mobile', icon: 'https://placehold.co/100x100/0f172a/3b82f6?text=PUBG' },
+                        { id: '3', name: 'Mobile Legends', icon: 'https://placehold.co/100x100/0f172a/8b5cf6?text=MLBB' },
+                        { id: '4', name: 'Other Games', icon: 'https://placehold.co/100x100/0f172a/ec4899?text=OTHER' }
+                    ];
+                    for (let c of cats) await this.db.put('categories', c);
+                }
+                this.categories = cats;
+
+                let accs = await this.db.getAll('accounts');
+                if (accs.length === 0) {
+                    accs = [
+                        { id: 'acc-101', game: 'Free Fire', title: 'Rare Incubator VIP Account', level: 72, price: 25.00, status: 'Available', desc: 'Includes 5 Evo Weapons Max, Hip Hop Season 1 Bundle.', images: ['https://placehold.co/600x350/0f172a/06b6d4?text=Free+Fire+VIP'] },
+                        { id: 'acc-102', game: 'PUBG Mobile', title: 'M416 Glacier Max + Conqueror', level: 68, price: 45.00, status: 'Available', desc: 'M416 Glacier Lv 7, Mythic Fashion.', images: ['https://placehold.co/600x350/0f172a/3b82f6?text=PUBG+Glacier'] },
+                        { id: 'acc-103', game: 'Mobile Legends', title: 'All Heroes + Collector Skins', level: 80, price: 30.00, status: 'Available', desc: 'Full Emblem Max, 250+ Skins.', images: ['https://placehold.co/600x350/0f172a/8b5cf6?text=Mobile+Legends'] }
+                    ];
+                    for (let a of accs) await this.db.put('accounts', a);
+                }
+                this.accounts = accs;
+
+                let banners = await this.db.getAll('banners');
+                if (banners.length === 0) {
+                    banners = [
+                        { id: 'b1', image: 'https://placehold.co/1000x400/0f172a/06b6d4?text=Welcome+to+G+martt' },
+                        { id: 'b2', image: 'https://placehold.co/1000x400/0f172a/3b82f6?text=Instant+Account+Delivery' }
+                    ];
+                    for (let b of banners) await this.db.put('banners', b);
+                }
+                this.banners = banners;
+
+                let services = await this.db.getAll('services');
+                if (services.length === 0) {
+                    services = [
+                        { id: 's1', title: 'Top Up Game Diamonds', desc: 'Instant diamond & UC top up', image: 'https://placehold.co/300x200/0f172a/06b6d4?text=Top+Up', link: 'https://t.me/zicksiik' },
+                        { id: 's2', title: 'Middleman Escrow', desc: 'Safe & secure trade escrow', image: 'https://placehold.co/300x200/0f172a/3b82f6?text=Escrow', link: 'https://t.me/zicksiik' },
+                        { id: 's3', title: 'Account Recovery', desc: 'Lost account security help', image: 'https://placehold.co/300x200/0f172a/8b5cf6?text=Recovery', link: 'https://t.me/zicksiik' },
+                        { id: 's4', title: 'VIP Membership Pass', desc: 'Exclusive discount pass', image: 'https://placehold.co/300x200/0f172a/ec4899?text=VIP+Pass', link: 'https://t.me/zicksiik' },
+                        { id: 's5', title: 'Account Appraisal', desc: 'Free market account check', image: 'https://placehold.co/300x200/0f172a/14b8a6?text=Appraisal', link: 'https://t.me/zicksiik' },
+                        { id: 's6', title: 'Express Account Transfer', desc: 'Safe login detail handoff', image: 'https://placehold.co/300x200/0f172a/f59e0b?text=Transfer', link: 'https://t.me/zicksiik' }
+                    ];
+                    for (let s of services) await this.db.put('services', s);
+                }
+                this.services = services;
+
+                this.orders = await this.db.getAll('orders');
+                let storedSettings = await this.db.getAll('settings');
+                let khqrSetting = storedSettings.find(s => s.key === 'khqr_image');
+                this.settings.khqr = khqrSetting ? khqrSetting.value : 'https://placehold.co/300x400/0f172a/06b6d4?text=KHQR+PAYMENT';
+                let logoSetting = storedSettings.find(s => s.key === 'site_logo');
+                this.settings.logo = logoSetting ? logoSetting.value : 'https://placehold.co/100x100/0f172a/06b6d4?text=GM';
+                let passSetting = storedSettings.find(s => s.key === 'admin_password');
+                this.settings.adminPassword = passSetting ? passSetting.value : 'ceogmart@2026';
+            }
+
+            setupRealtimeSync() {
+                this.syncChannel.onmessage = async (event) => {
+                    if (event.data && event.data.type === 'DATA_UPDATED') {
+                        await this.loadInitialData();
+                        this.renderAll();
+                    }
+                };
+            }
+
+            notifySync() {
+                this.syncChannel.postMessage({ type: 'DATA_UPDATED', timestamp: Date.now() });
+            }
+
+            renderAll() {
+                this.renderSiteLogo();
+                this.renderCategories();
+                this.renderBanners();
+                this.renderAccounts();
+                this.renderServices();
+                if (this.isAdminAuthenticated) this.renderAdminPanels();
+            }
+
+            renderSiteLogo() {
+                const logoImg = document.getElementById('siteLogoImg');
+                if (logoImg && this.settings.logo) logoImg.src = this.settings.logo;
+            }
+
+            renderCategories() {
+                const container = document.getElementById('categoriesContainer');
+                document.getElementById('categoryCountBadge').innerText = `${this.categories.length} Categories`;
+                let html = `
+                    <button onclick="app.selectCategory('All')" class="shrink-0 flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition ${this.selectedCategory === 'All' ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-md' : 'bg-slate-900 text-slate-300 border border-blue-500/30'}">
+                        <i class="fa-solid fa-border-all"></i>
+                        <span>All Games</span>
+                    </button>
+                `;
+                this.categories.forEach(cat => {
+                    const isSelected = this.selectedCategory === cat.name;
+                    html += `
+                        <button onclick="app.selectCategory('${cat.name}')" class="shrink-0 flex items-center space-x-2 px-3 py-1.5 rounded-xl text-xs font-bold transition ${isSelected ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-md' : 'bg-slate-900 text-slate-300 border border-blue-500/30 hover:border-cyan-400'}">
+                            <img src="${cat.icon}" alt="${cat.name}" class="w-5 h-5 rounded-md object-cover" onerror="this.src='https://placehold.co/50x50/0f172a/06b6d4?text=GM'">
+                            <span>${cat.name}</span>
+                        </button>
+                    `;
+                });
+                container.innerHTML = html;
+            }
+
+            selectCategory(catName) {
+                this.selectedCategory = catName;
+                this.renderCategories();
+                this.renderAccounts();
+            }
+
+            renderBanners() {
+                const container = document.getElementById('bannerCarousel');
+                const indicators = document.getElementById('bannerIndicators');
+                if (this.banners.length === 0) return;
+                let html = '', indHtml = '';
+                this.banners.forEach((b, idx) => {
+                    html += `<img src="${b.image}" class="w-full h-full object-cover shrink-0" alt="Banner ${idx}">`;
+                    indHtml += `<div class="w-2 h-2 rounded-full transition-all ${idx === this.currentBannerIndex ? 'bg-cyan-400 w-5' : 'bg-white/40'}"></div>`;
+                });
+                container.innerHTML = html;
+                indicators.innerHTML = indHtml;
+                container.style.transform = `translateX(-${this.currentBannerIndex * 100}%)`;
+
+                if (!this.bannerInterval && this.banners.length > 1) {
+                    this.bannerInterval = setInterval(() => this.nextBanner(), 4000);
+                }
+            }
+
+            nextBanner() {
+                if (this.banners.length <= 1) return;
+                this.currentBannerIndex = (this.currentBannerIndex + 1) % this.banners.length;
+                this.renderBanners();
+            }
+
+            prevBanner() {
+                if (this.banners.length <= 1) return;
+                this.currentBannerIndex = (this.currentBannerIndex - 1 + this.banners.length) % this.banners.length;
+                this.renderBanners();
+            }
+
+            renderAccounts() {
+                const grid = document.getElementById('accountsGrid');
+                const emptyState = document.getElementById('noAccountsState');
+                const searchQuery = (document.getElementById('searchInput').value || '').toLowerCase();
+
+                let filtered = this.accounts.filter(a => {
+                    const matchCat = this.selectedCategory === 'All' || a.game === this.selectedCategory;
+                    const matchSearch = a.title.toLowerCase().includes(searchQuery) || a.game.toLowerCase().includes(searchQuery);
+                    return matchCat && matchSearch;
+                });
+
+                if (filtered.length === 0) {
+                    grid.innerHTML = '';
+                    emptyState.classList.remove('hidden');
+                    return;
+                }
+                emptyState.classList.add('hidden');
+                let html = '';
+                filtered.forEach(acc => {
+                    const isAvailable = acc.status === 'Available';
+                    const mainImg = (acc.images && acc.images.length > 0) ? acc.images[0] : 'https://placehold.co/600x350/0f172a/06b6d4?text=G+martt';
+                    html += `
+                        <div class="bg-slate-900 rounded-2xl border border-blue-500/30 overflow-hidden shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col group">
+                            <div class="relative aspect-video bg-slate-950 overflow-hidden cursor-pointer" onclick="app.openAccountModal('${acc.id}')">
+                                <img src="${mainImg}" alt="${acc.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                                <div class="absolute top-2 left-2 flex space-x-1">
+                                    <span class="px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md text-white text-[10px] font-bold uppercase border border-blue-500/30">${acc.game}</span>
+                                    <span class="px-2 py-0.5 rounded-md bg-blue-600 text-white text-[10px] font-bold">LVL ${acc.level}</span>
+                                </div>
+                                <div class="absolute bottom-2 right-2">
+                                    <span class="px-2 py-0.5 rounded-full ${isAvailable ? 'bg-cyan-500/90 text-slate-950' : 'bg-red-500/90 text-white'} text-[10px] font-bold uppercase backdrop-blur-xs">
+                                        ${acc.status}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="p-3.5 flex-grow flex flex-col justify-between space-y-3">
+                                <div>
+                                    <h3 class="gaming-font text-base font-bold text-slate-100 line-clamp-1 group-hover:text-cyan-400 transition cursor-pointer" onclick="app.openAccountModal('${acc.id}')">
+                                        ${acc.title}
+                                    </h3>
+                                    <p class="text-[11px] text-slate-400 line-clamp-2 mt-1">${acc.desc}</p>
+                                </div>
+                                <div class="flex items-center justify-between pt-2 border-t border-slate-800">
+                                    <div>
+                                        <span class="text-[10px] text-slate-500 font-semibold block">PRICE</span>
+                                        <span class="gaming-font text-xl font-extrabold text-cyan-400">$${parseFloat(acc.price).toFixed(2)}</span>
+                                    </div>
+                                    ${isAvailable ? `
+                                        <button onclick="app.openAccountModal('${acc.id}')" class="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 text-white font-extrabold gaming-font text-xs fire-glow-btn flex items-center justify-center space-x-1">
+                                            <canvas class="fire-canvas"></canvas>
+                                            <span class="btn-text-content">BUY NOW</span>
+                                        </button>
+                                    ` : `
+                                        <button disabled class="px-4 py-2 rounded-xl bg-slate-800 text-slate-500 text-xs font-bold cursor-not-allowed">
+                                            SOLD OUT
+                                        </button>
+                                    `}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                grid.innerHTML = html;
+            }
+
+            renderServices() {
+                const grid = document.getElementById('servicesGrid');
+                let html = '';
+                this.services.slice(0, 6).forEach(s => {
+                    html += `
+                        <div class="bg-slate-900 p-3 rounded-2xl border border-blue-500/30 shadow-xs flex flex-col justify-between space-y-2 hover:border-cyan-400 transition">
+                            <div class="aspect-video rounded-xl overflow-hidden bg-slate-950">
+                                <img src="${s.image}" alt="${s.title}" class="w-full h-full object-cover">
+                            </div>
+                            <div>
+                                <h4 class="gaming-font text-sm font-bold text-slate-100 line-clamp-1">${s.title}</h4>
+                                <p class="text-[10px] text-slate-400 line-clamp-2">${s.desc || ''}</p>
+                            </div>
+                            <a href="${s.link || '#'}" target="_blank" class="w-full py-1.5 rounded-lg bg-blue-950/60 text-cyan-300 border border-blue-500/30 hover:bg-cyan-500 hover:text-slate-950 transition text-center text-[11px] font-bold block">
+                                Service Details <i class="fa-solid fa-arrow-right text-[9px] ml-1"></i>
+                            </a>
+                        </div>
+                    `;
+                });
+                grid.innerHTML = html;
+            }
+
+            filterAccounts() { this.renderAccounts(); }
+
+            openAccountModal(accId) {
+                const acc = this.accounts.find(a => a.id === accId);
+                if (!acc) return;
+                this.activeAccount = acc;
+                document.getElementById('modalGameBadge').innerText = acc.game;
+                document.getElementById('modalLevelBadge').innerText = `LVL ${acc.level}`;
+                document.getElementById('modalAccountTitle').innerText = acc.title;
+                document.getElementById('modalAccountId').innerText = `ID: #${acc.id}`;
+                document.getElementById('modalAccountPrice').innerText = `$${parseFloat(acc.price).toFixed(2)}`;
+                document.getElementById('modalAccountDesc').innerText = acc.desc;
+                document.getElementById('modalStockStatus').innerText = acc.status;
+
+                const mainImg = document.getElementById('modalMainImage');
+                const thumbsContainer = document.getElementById('modalThumbnails');
+                const images = (acc.images && acc.images.length > 0) ? acc.images : ['https://placehold.co/600x350/0f172a/06b6d4?text=G+martt'];
+                mainImg.src = images[0];
+
+                let thumbHtml = '';
+                images.forEach(img => {
+                    thumbHtml += `<img src="${img}" onclick="document.getElementById('modalMainImage').src='${img}'" class="w-12 h-9 object-cover rounded border border-slate-700 cursor-pointer hover:border-cyan-400">`;
+                });
+                thumbsContainer.innerHTML = thumbHtml;
+                document.getElementById('accountModal').classList.remove('hidden', 'opacity-0');
+            }
+
+            closeAccountModal() {
+                document.getElementById('accountModal').classList.add('opacity-0');
+                setTimeout(() => document.getElementById('accountModal').classList.add('hidden'), 300);
+            }
+
+            proceedToCheckout() {
+                this.closeAccountModal();
+                if (!this.activeAccount || this.activeAccount.status !== 'Available') return;
+                const orderId = `GM-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+                document.getElementById('checkoutOrderId').innerText = orderId;
+                document.getElementById('summaryGame').innerText = this.activeAccount.game;
+                document.getElementById('summaryTitle').innerText = this.activeAccount.title;
+                document.getElementById('summaryLevel').innerText = `LVL ${this.activeAccount.level}`;
+                document.getElementById('summaryPrice').innerText = `$${parseFloat(this.activeAccount.price).toFixed(2)}`;
+                document.getElementById('khqrDisplayImg').src = this.settings.khqr;
+                document.getElementById('checkoutStep1').classList.remove('hidden');
+                document.getElementById('checkoutStep2').classList.add('hidden');
+                document.getElementById('checkoutModal').classList.remove('hidden', 'opacity-0');
+            }
+
+            closeCheckoutModal() {
+                document.getElementById('checkoutModal').classList.add('opacity-0');
+                setTimeout(() => document.getElementById('checkoutModal').classList.add('hidden'), 300);
+            }
+
+            async submitOrderAndShowPayment() {
+                const nameInput = document.getElementById('customerNameInput').value.trim();
+                if (!nameInput) { alert('Please enter your NAME / USERNAME.'); return; }
+                const currentAcc = this.accounts.find(a => a.id === this.activeAccount.id);
+                currentAcc.status = 'Sold';
+                await this.db.put('accounts', currentAcc);
+
+                const newOrder = {
+                    id: document.getElementById('checkoutOrderId').innerText,
+                    customerName: nameInput,
+                    accountTitle: currentAcc.title,
+                    price: currentAcc.price,
+                    createdAt: new Date().toISOString()
+                };
+                await this.db.put('orders', newOrder);
+                this.notifySync();
+                this.renderAccounts();
+
+                document.getElementById('checkoutStep1').classList.add('hidden');
+                document.getElementById('checkoutStep2').classList.remove('hidden');
+            }
+
+            sendTelegramReport() {
+                if (!this.activeAccount) return;
+                const name = document.getElementById('customerNameInput').value.trim() || 'N/A';
+                const text = `សួស្ដីបង! ខ្ញុំបាន pay លុយរួចរាល់ហើយ\nNAME: ${name}\nACCOUNT: ${this.activeAccount.title}\nPRICE: $${this.activeAccount.price}`;
+                window.open(`https://t.me/zicksiik?text=${encodeURIComponent(text)}`, '_blank');
+            }
+
+            sendPageReport() {
+                window.open("https://www.facebook.com/share/1CGi7f9kEZ/?mibextid=wwXIfr", '_blank');
+            }
+
+            openAdminModal() { document.getElementById('adminModal').classList.remove('hidden'); }
+            closeAdminModal() { document.getElementById('adminModal').classList.add('hidden'); }
+            handleAdminLogin(e) {
+                e.preventDefault();
+                if (document.getElementById('adminPasswordInput').value === this.settings.adminPassword) {
+                    this.isAdminAuthenticated = true;
+                    document.getElementById('adminLoginForm').classList.add('hidden');
+                    document.getElementById('adminDashboard').classList.remove('hidden');
+                    document.getElementById('adminAuthStatus').innerText = 'Status: Authenticated Admin';
+                    this.renderAdminPanels();
+                } else { alert('Invalid Password!'); }
+            }
+            adminLogout() {
+                this.isAdminAuthenticated = false;
+                document.getElementById('adminLoginForm').classList.remove('hidden');
+                document.getElementById('adminDashboard').classList.add('hidden');
+            }
+            switchAdminTab(tab) {
+                document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.add('hidden'));
+                document.getElementById(`adminTab${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.remove('hidden');
+            }
+            renderAdminPanels() {
+                document.getElementById('statTotalAccounts').innerText = this.accounts.length;
+                document.getElementById('statAvailableAccounts').innerText = this.accounts.filter(a => a.status === 'Available').length;
+                document.getElementById('statSoldAccounts').innerText = this.accounts.filter(a => a.status === 'Sold').length;
+            }
+        }
+
+        let app;
+        window.addEventListener('DOMContentLoaded', () => {
+            app = new GMarttApp();
+            app.start();
+        });
+    </script>
+
+    <!-- --- MUSIC PLAYER JAVASCRIPT --- -->
+    <script>
+    (function(){
+        var tracks = [
+          "https://videotourl.com/audio/1792768675577-194b7ee0-1723-40c8-ab76-86932f2b9416.mp3",
+          "https://videotourl.com/audio/1792769884202-0569790f-171d-41c8-9821-9e4c728eea26.mp3",
+          "https://videotourl.com/audio/1792769211977-880512eb-af66-41a6-b52a-7aa8e283fea6.mp3",
+          "https://videotourl.com/audio/1792821052559-047db175-da81-45f1-a73b-db73eed403dc.mp3",
+          "https://videotourl.com/audio/1792769891068-52ac7753-faa7-41bb-8741-3c37d15ce3e4.mp3",
+          "https://videotourl.com/audio/1792821055916-daaafae7-7770-4165-9820-e1cce528e5a6.mp3",
+          "https://videotourl.com/audio/1792821047244-7fc964f8-2ef6-40a6-9bf8-66f70a1d04dc.mp3",
+          "https://videotourl.com/audio/1792738314007-d32aa4a3-7a20-4fc1-9f43-826621a7537d.mp3",
+          "https://videotourl.com/audio/1792769877113-9266ba50-727f-440c-94b6-2103f5d43468.mp3",
+          "https://videotourl.com/audio/1792768783675-4dbf0415-3e26-4e57-9782-803cf5fdf652.mp3"
+        ];
+
+        var currentTrack = 0;
+        var audio = document.getElementById('ma');
+        var mp = document.getElementById('mp');
+        var fab = document.getElementById('mfab');
+        var btns = mp.querySelectorAll('li button');
+        var mt = document.getElementById('mt');
+
+        function loadTrack(index, playFlag) {
+          currentTrack = index;
+          audio.src = tracks[currentTrack];
+          btns.forEach(function(b, idx){
+            b.className = (idx === currentTrack) ? 'sel' : '';
+          });
+          if(playFlag) {
+            audio.play().catch(function(err){ console.log("Auto-play prevented:", err); });
+          }
+        }
+
+        audio.addEventListener('ended', function(){
+          currentTrack++;
+          if(currentTrack < tracks.length) {
+            loadTrack(currentTrack, true);
+          } else {
+            currentTrack = 0;
+            loadTrack(currentTrack, false);
+          }
+        });
+
+        btns.forEach(function(b){
+          b.addEventListener('click', function(){
+            var i = +b.getAttribute('data-i');
+            loadTrack(i, true);
+            mt.className = 'mtoast hide';
+          });
+        });
+
+        fab.addEventListener('click', function(){
+          var off = mp.classList.toggle('off');
+          fab.setAttribute('aria-expanded', !off);
+          mt.className = 'mtoast hide';
+        });
+
+        loadTrack(0, false);
+    })();
+    </script>
+
+    <!-- --- DOLLAR RAIN SMOOTH CANVAS ANIMATION ($\text{💸} / \$$) --- -->
+    <script>
+    (function(){
+        const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+        if (reduce.matches) return;
+
+        const c = document.createElement('canvas');
+        c.id = 'moneyRain';
+        document.body.appendChild(c);
+        const ctx = c.getContext('2d');
+        
+        let W, H, D, items = [], sprites = [], last = 0, on = true;
+
+        const createDollarSprite = (size, type) => {
+            const p = Math.ceil(size * 1.6 * D);
+            const s = document.createElement('canvas');
+            s.width = s.height = p;
+            const g = s.getContext('2d');
+            g.font = `bold ${size * D}px "Rajdhani", "Apple Color Emoji", "Segoe UI Emoji", sans-serif`;
+            g.textAlign = 'center';
+            g.textBaseline = 'middle';
+            
+            if (type === 0) {
+                g.fillStyle = '#06B6D4'; // Cyan Dollar Sign
+                g.shadowColor = 'rgba(6, 182, 212, 0.8)';
+                g.shadowBlur = 8 * D;
+                g.fillText('$', p / 2, p / 2);
+            } else if (type === 1) {
+                g.fillStyle = '#3B82F6'; // Blue Dollar Sign
+                g.shadowColor = 'rgba(59, 130, 246, 0.8)';
+                g.shadowBlur = 8 * D;
+                g.fillText('$', p / 2, p / 2);
+            } else {
+                g.fillText('\u{1F4B8}', p / 2, p / 2); // 💸 Dollar Fly Emoji
+            }
+            return s;
+        };
+
+        const spawnItem = (init) => {
+            const k = Math.random() * 3 | 0;
+            return {
+                x: Math.random() * W,
+                y: init ? Math.random() * H : -50,
+                k: k,
+                v: 45 + Math.random() * 55 + k * 12,
+                sw: Math.random() * 6.28,
+                sa: 12 + Math.random() * 24,
+                r: Math.random() * 6.28,
+                rv: (Math.random() - 0.5) * 1.2,
+                a: 0.5 + Math.random() * 0.45
+            };
+        };
+
+        const resize = () => {
+            D = Math.min(devicePixelRatio || 1, 2);
+            W = innerWidth;
+            H = innerHeight;
+            c.width = W * D;
+            c.height = H * D;
+            
+            sprites = [
+                createDollarSprite(18, 0),
+                createDollarSprite(24, 1),
+                createDollarSprite(28, 2)
+            ];
+            
+            const count = W < 640 ? 18 : 32;
+            items = Array.from({ length: count }, () => spawnItem(true));
+        };
+
+        const renderFrame = (time) => {
+            if (!on) return;
+            const dt = Math.min((time - last) / 1000, 0.05);
+            last = time;
+            
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.clearRect(0, 0, c.width, c.height);
+
+            for (const p of items) {
+                p.y += p.v * dt;
+                p.sw += dt * 1.5;
+                p.r += p.rv * dt;
+
+                if (p.y > H + 50) {
+                    Object.assign(p, spawnItem(false));
+                }
+
+                const s = sprites[p.k];
+                const h = s.width / 2;
+                
+                ctx.setTransform(1, 0, 0, 1, (p.x + Math.sin(p.sw) * p.sa) * D, p.y * D);
+                ctx.rotate(p.r * 0.3);
+                ctx.globalAlpha = p.a;
+                ctx.drawImage(s, -h, -h);
+            }
+            requestAnimationFrame(renderFrame);
+        };
+
+        let rt;
+        addEventListener('resize', () => {
+            clearTimeout(rt);
+            rt = setTimeout(resize, 200);
+        });
+        
+        document.addEventListener('visibilitychange', () => {
+            on = !document.hidden;
+            if (on) {
+                last = performance.now();
+                requestAnimationFrame(renderFrame);
+            }
+        });
+
+        resize();
+        requestAnimationFrame(renderFrame);
+    })();
+    </script>
+</body>
+</html>
